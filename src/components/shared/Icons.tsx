@@ -1,0 +1,58 @@
+import type { ReactNode } from "react"
+
+export function CitroenMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path
+        d="M3 11.2 12 5.2 21 11.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3 17.2 12 11.2 21 17.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function FuelCan({ percent, className }: { percent: number; className?: string }) {
+  return (
+    <div className={className}>
+      <svg viewBox="0 0 88 110" className="h-full w-full" aria-hidden>
+        <path
+          d="M22 18h28l10 10h10v8h-8v62a10 10 0 0 1-10 10H22a10 10 0 0 1-10-10V28a10 10 0 0 1 10-10z"
+          fill="#F57C00"
+        />
+        <rect x="18" y="32" width="48" height="52" rx="4" fill="#FFB74D" />
+        <rect x="54" y="14" width="16" height="10" rx="3" fill="#EF6C00" />
+        <text
+          x="42"
+          y="64"
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="22"
+          fontWeight="700"
+          fontFamily="Roboto, sans-serif"
+        >
+          {Math.round(percent)}%
+        </text>
+      </svg>
+    </div>
+  )
+}
+
+export function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="mb-2 px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
+      {children}
+    </p>
+  )
+}

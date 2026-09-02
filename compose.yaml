@@ -1,0 +1,8 @@
+services:
+  drivly:
+    build: .
+    image: drivly:local
+    container_name: drivly
+    restart: unless-stopped
+    ports:
+      - "${DRIVLY_PORT:-80}:80"
