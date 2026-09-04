@@ -33,7 +33,7 @@ export function QuickAddModal() {
         className="absolute inset-0 bg-black/35"
         onClick={() => setQuickAddOpen(false)}
       />
-      <div className="absolute bottom-[84px] left-1/2 w-[210px] -translate-x-1/2">
+      <div className="absolute bottom-[108px] left-1/2 w-[210px] -translate-x-1/2">
         <div className="overflow-hidden rounded-xl bg-white py-2 shadow-2xl">
           {items.map((item) => {
             const Icon = item.Icon
