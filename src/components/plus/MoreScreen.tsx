@@ -1,8 +1,9 @@
-import { Download, RotateCcw, Trash2, Upload } from "lucide-react"
+import { Download, RotateCcw, Smartphone, Trash2, Upload } from "lucide-react"
 import { useRef } from "react"
 import { db } from "../../db/db"
 import { seedIfEmpty } from "../../db/seed"
 import { useApp } from "../../hooks/useApp"
+import { usePwaInstall } from "../../hooks/usePwaInstall"
 import { downloadJson, exportAll, importAll, type ExportPayload } from "../../utils/export"
 import { formatKm } from "../../utils/format"
 import { Card } from "../shared/Form"
@@ -10,6 +11,7 @@ import { Card } from "../shared/Form"
 export function MoreScreen() {
   const { vehicles, vehicle, setVehicleId } = useApp()
   const fileRef = useRef<HTMLInputElement>(null)
+  const pwa = usePwaInstall()
 
   async function handleExport() {
     downloadJson(await exportAll(), `drivly-export-${new Date().toISOString().slice(0, 10)}.json`)
@@ -66,6 +68,22 @@ export function MoreScreen() {
       </Card>
 
       <Card className="divide-y divide-line">
+        {pwa.canInstall ? (
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 px-4 py-3 text-left"
+            onClick={() => void pwa.install()}
+          >
+            <Smartphone className="h-5 w-5 text-teal" />
+            Installer l'application
+          </button>
+        ) : null}
+        {pwa.installed ? (
+          <p className="flex items-center gap-3 px-4 py-3 text-sm text-muted">
+            <Smartphone className="h-5 w-5 text-teal" />
+            Application installée
+          </p>
+        ) : null}
         <button type="button" className="flex w-full items-center gap-3 px-4 py-3 text-left" onClick={() => void handleExport()}>
           <Download className="h-5 w-5 text-teal" />
           Exporter JSON

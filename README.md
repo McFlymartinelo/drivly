@@ -1,6 +1,6 @@
 # Drivly
 
-Suivi de véhicules, local-first (IndexedDB). PWA-ready.
+Suivi de véhicules, local-first (IndexedDB). **PWA** (service worker, manifeste, icônes PNG).
 
 ```bash
 npm install
@@ -68,6 +68,15 @@ sudo certbot --nginx -d drivly.exemple.fr
 En Docker, place un reverse-proxy (Caddy / nginx) devant le conteneur, ou mappe 80/443 sur un proxy existant.
 
 Si nginx est **déjà** sur le port 80, lance Drivly sur 8080 puis utilise `deploy/nginx.reverse-proxy.conf` (remplace `server_name`).
+
+## PWA (installer sur l’écran d’accueil)
+
+L’app s’installe comme une application (Chrome / Edge / Safari iOS).
+
+- En local : `npm run build && npm run preview`, puis « Installer » dans le navigateur (`http://127.0.0.1:4173`).
+- À distance : **HTTPS est obligatoire** (Certbot). HTTP sur une IP ne propose pas l’installation.
+- Sur iPhone : Partager → Sur l’écran d’accueil.
+- Écran **Plus** : bouton « Installer l'application » quand le navigateur le propose.
 
 ## Export / import
 
