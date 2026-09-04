@@ -2,6 +2,7 @@ import type { Refueling, Reminder, Vehicle } from "../types"
 import { db } from "./db"
 
 const VEHICLE_ID = "veh-citroen-c4"
+const PLATE = "CJ-653-HM"
 
 function money(litres: number, prix: number): number {
   return Math.round(litres * prix * 100) / 100
@@ -29,6 +30,11 @@ const fills: Array<{
 ]
 
 export async function seedIfEmpty(): Promise<void> {
+  const existing = await db.vehicles.get(VEHICLE_ID)
+  if (existing && existing.immatriculation !== PLATE) {
+    await db.vehicles.update(VEHICLE_ID, { immatriculation: PLATE })
+  }
+
   const count = await db.vehicles.count()
   if (count > 0) return
 
@@ -39,7 +45,7 @@ export async function seedIfEmpty(): Promise<void> {
     nom: "Citroën C4",
     marque: "Citroën",
     modele: "C4",
-    immatriculation: "AB-123-CD",
+    immatriculation: PLATE,
     kmInitial: 182162,
     kmActuel: 192065,
     carburantDefaut: "Diesel",

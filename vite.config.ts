@@ -71,6 +71,16 @@ export default defineConfig({
               expiration: { maxEntries: 16, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
+          {
+            urlPattern:
+              /^https:\/\/cdn\.jsdelivr\.net\/gh\/filippofilip95\/car-logos-dataset@.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "brand-logos",
+              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
       devOptions: {

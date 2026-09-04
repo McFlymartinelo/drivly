@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom"
 import { useApp } from "../../hooks/useApp"
 import { formatKm } from "../../utils/format"
 import { downloadJson, exportAll } from "../../utils/export"
-import { CitroenMark } from "../shared/Icons"
+import { BrandLogo } from "../shared/BrandLogo"
 
 export function Header({
   onOpenVehicles,
@@ -29,8 +29,8 @@ export function Header({
           onClick={onOpenVehicles}
           className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-black/20 px-2 py-1.5 text-left"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-teal">
-            <CitroenMark className="h-6 w-6" />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 text-teal">
+            <BrandLogo marque={vehicle?.marque} className="h-7 w-7" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-bold leading-tight">

@@ -1,28 +1,5 @@
 import type { ReactNode } from "react"
 
-export function CitroenMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden>
-      <path
-        d="M3 11.2 12 5.2 21 11.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <path
-        d="M3 17.2 12 11.2 21 17.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 export function FuelCan({ percent, className }: { percent: number; className?: string }) {
   return (
     <div className={className}>

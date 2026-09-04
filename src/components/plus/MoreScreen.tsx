@@ -6,6 +6,7 @@ import { useApp } from "../../hooks/useApp"
 import { usePwaInstall } from "../../hooks/usePwaInstall"
 import { downloadJson, exportAll, importAll, type ExportPayload } from "../../utils/export"
 import { formatKm } from "../../utils/format"
+import { BrandLogo } from "../shared/BrandLogo"
 import { Card } from "../shared/Form"
 
 export function MoreScreen() {
@@ -53,12 +54,17 @@ export function MoreScreen() {
       <Card className="divide-y divide-line">
         {vehicles.map((v) => (
           <div key={v.id} className="flex items-center justify-between px-4 py-3">
-            <button type="button" className="text-left" onClick={() => setVehicleId(v.id)}>
-              <p className="font-semibold">{v.nom}</p>
-              <p className="text-xs text-muted">
-                {v.immatriculation || "Sans immatriculation"} · {formatKm(v.kmActuel)}
-                {v.id === vehicle?.id ? " · Actif" : ""}
-              </p>
+            <button type="button" className="flex min-w-0 items-center gap-3 text-left" onClick={() => setVehicleId(v.id)}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white p-1.5 shadow-sm">
+                <BrandLogo marque={v.marque} className="h-7 w-7" />
+              </span>
+              <span className="min-w-0">
+                <p className="font-semibold">{v.nom}</p>
+                <p className="text-xs text-muted">
+                  {v.immatriculation || "Sans immatriculation"} · {formatKm(v.kmActuel)}
+                  {v.id === vehicle?.id ? " · Actif" : ""}
+                </p>
+              </span>
             </button>
             <button type="button" aria-label="Supprimer" className="text-muted" onClick={() => void deleteVehicle(v.id)}>
               <Trash2 className="h-5 w-5" />

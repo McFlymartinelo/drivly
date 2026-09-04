@@ -1,10 +1,13 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import type { BrandEntry } from "../../brands/catalog"
+import { resolveBrand } from "../../brands/resolve"
 import { db } from "../../db/db"
 import { useApp } from "../../hooks/useApp"
 import { uid } from "../../utils/cn"
 import { formatKm } from "../../utils/format"
-import { CitroenMark } from "../shared/Icons"
+import { BrandLogo } from "../shared/BrandLogo"
+import { BrandPicker } from "../shared/BrandPicker"
 
 export function VehicleSwitcher({
   open,
@@ -16,6 +19,7 @@ export function VehicleSwitcher({
   const { vehicles, vehicleId, setVehicleId } = useApp()
   const [creating, setCreating] = useState(false)
   const [nom, setNom] = useState("")
+  const [brand, setBrand] = useState<BrandEntry | null>(null)
   const navigate = useNavigate()
 
   if (!open) return null
@@ -23,12 +27,18 @@ export function VehicleSwitcher({
   async function addVehicle() {
     const name = nom.trim()
     if (!name) return
+    const inferred = brand ?? resolveBrand(name)
+    const marque = inferred?.name ?? (name.split(" ")[0] ?? name)
+    const modele = inferred
+      ? name
+      : name.split(" ").slice(1).join(" ") || name
+    const displayName = inferred ? `${inferred.name} ${name}`.trim() : name
     const id = uid()
     await db.vehicles.add({
       id,
-      nom: name,
-      marque: name.split(" ")[0] ?? name,
-      modele: name.split(" ").slice(1).join(" ") || name,
+      nom: displayName,
+      marque,
+      modele,
       immatriculation: "",
       kmInitial: 0,
       kmActuel: 0,
@@ -38,6 +48,7 @@ export function VehicleSwitcher({
     })
     setVehicleId(id)
     setNom("")
+    setBrand(null)
     setCreating(false)
     onClose()
   }
@@ -45,7 +56,7 @@ export function VehicleSwitcher({
   return (
     <div className="absolute inset-0 z-50">
       <button type="button" className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Fermer" />
-      <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-4 pb-[calc(16px+env(safe-area-inset-bottom))] shadow-2xl">
+      <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white p-4 pb-[calc(16px+env(safe-area-inset-bottom))] shadow-2xl">
         <p className="mb-3 text-sm font-bold text-ink">Véhicules</p>
         <div className="space-y-2">
           {vehicles.map((v) => (
@@ -60,8 +71,8 @@ export function VehicleSwitcher({
                 onClose()
               }}
             >
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-white text-teal shadow-sm">
-                <CitroenMark className="h-6 w-6" />
+              <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-white p-1.5 text-teal shadow-sm">
+                <BrandLogo marque={v.marque} className="h-7 w-7" />
               </span>
               <span>
                 <span className="block font-semibold">{v.marque || v.nom}</span>
@@ -73,20 +84,23 @@ export function VehicleSwitcher({
           ))}
         </div>
         {creating ? (
-          <div className="mt-3 flex gap-2">
-            <input
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-              placeholder="Nom du véhicule"
-              className="flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-teal"
-            />
-            <button
-              type="button"
-              onClick={() => void addVehicle()}
-              className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
-            >
-              OK
-            </button>
+          <div className="mt-3 space-y-2">
+            <BrandPicker value={brand} onChange={setBrand} />
+            <div className="flex gap-2">
+              <input
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                placeholder={brand ? "Modèle (ex. C4)" : "Nom du véhicule"}
+                className="flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-teal"
+              />
+              <button
+                type="button"
+                onClick={() => void addVehicle()}
+                className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
+              >
+                OK
+              </button>
+            </div>
           </div>
         ) : (
           <button
