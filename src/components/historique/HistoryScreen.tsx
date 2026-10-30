@@ -1,4 +1,19 @@
-import { AlarmClock, ClipboardCheck, Eye, FileSpreadsheet, Fuel, Info, Pencil, Route, Trash2, Wallet, Wrench } from "lucide-react"
+import { addYears, differenceInYears, parseISO } from "date-fns"
+import {
+  AlarmClock,
+  Cake,
+  ClipboardCheck,
+  Eye,
+  FileSpreadsheet,
+  Fuel,
+  Info,
+  Pencil,
+  Route,
+  Trash2,
+  Trophy,
+  Wallet,
+  Wrench,
+} from "lucide-react"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { db } from "../../db/db"
@@ -9,10 +24,13 @@ import { cn } from "../../utils/cn"
 import {
   formatConsumption,
   formatDayMonth,
+  formatDecimal,
   formatKm,
   formatLitres,
   formatMoney,
+  formatMonthName,
   formatMonthYear,
+  formatNumber,
   formatPricePerLitre,
 } from "../../utils/format"
 
@@ -37,7 +55,84 @@ export function HistoryScreen() {
     [reminders],
   )
 
-  const events = useMemo(() => {
+  // Une année de suivi est fêtée chaque année à la date du premier enregistrement.
+  const anniversaries = useMemo(() => {
+    const start = [
+      vehicle?.createdAt,
+      ...refuelings.map((f) => f.date),
+      ...expenses.map((e) => e.date),
+      ...maintenances.map((m) => m.date),
+    ]
+      .filter((d): d is string => Boolean(d))
+      .sort()[0]
+    if (!start) return [] as TimelineEvent[]
+    const years = differenceInYears(new Date(), parseISO(start))
+    const list: TimelineEvent[] = []
+    for (let year = 1; year <= years; year += 1) {
+      const date = addYears(parseISO(start), year).toISOString()
+      list.push({
+        id: `anniversary-${year}`,
+        kind: "anniversary",
+        date,
+        title:
+          year === 1
+            ? "Vous avez terminé une année de contrôle de votre véhicule."
+            : `Vous avez complété ${year} année(s) de contrôle de votre véhicule.`,
+        subtitle: "",
+        count: year,
+      })
+    }
+    return list
+  }, [vehicle?.createdAt, refuelings, expenses, maintenances])
+
+  // Statistiques mensuelles (distance et consommation moyenne pondérée), comme
+  // le récapitulatif affiché au-dessus de chaque mois de l'historique.
+  const monthStats = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        distance: number | null
+        consumption: number | null
+        biggest: { title: string; amount: number } | null
+      }
+    >()
+    const keys = new Set<string>()
+    for (const f of refuelings) keys.add(f.date.slice(0, 7))
+    for (const e of expenses) keys.add(e.date.slice(0, 7))
+    for (const m of maintenances) keys.add(m.date.slice(0, 7))
+
+    for (const key of keys) {
+      const fills = refuelings.filter((f) => f.date.slice(0, 7) === key)
+      let distanceSum = 0
+      let litresSum = 0
+      for (const f of fills) {
+        const stats = computeRefuelingStats(f, refuelings, vehicle)
+        if (stats.distance != null && stats.consommation != null) {
+          distanceSum += stats.distance
+          litresSum += f.litres
+        }
+      }
+      const km = fills.map((f) => f.kilometrage)
+      const biggest = [
+        ...expenses
+          .filter((e) => e.date.slice(0, 7) === key)
+          .map((e) => ({ title: e.categorie, amount: e.montant })),
+        ...maintenances
+          .filter((m) => m.date.slice(0, 7) === key)
+          .map((m) => ({ title: m.typeEntretien || "Entretien", amount: m.coutTotal })),
+      ].sort((a, b) => b.amount - a.amount)[0] ?? null
+
+      map.set(key, {
+        distance: km.length >= 2 ? Math.max(...km) - Math.min(...km) : null,
+        consumption:
+          distanceSum > 0 ? (litresSum / distanceSum) * 100 : null,
+        biggest,
+      })
+    }
+    return map
+  }, [refuelings, expenses, maintenances, vehicle])
+
+  const baseEvents = useMemo(() => {
     const list: TimelineEvent[] = []
     for (const f of refuelings) {
       list.push({
@@ -112,6 +207,20 @@ export function HistoryScreen() {
         subtitle: `${c.items.filter((i) => i.done).length}/${c.items.length} faits`,
       })
     }
+    return list
+  }, [refuelings, expenses, revenues, maintenances, readings, trips, checklists])
+
+  const events = useMemo(() => {
+    const list = [...baseEvents]
+    for (const anniversary of anniversaries) {
+      const previous = baseEvents
+        .filter((e) => e.date < anniversary.date)
+        .sort((a, b) => b.date.localeCompare(a.date))[0]
+      list.push({
+        ...anniversary,
+        groupKey: previous ? previous.date.slice(0, 7) : undefined,
+      })
+    }
     const q = search.trim().toLowerCase()
     return list
       .filter((e) =>
@@ -120,15 +229,15 @@ export function HistoryScreen() {
           : true,
       )
       .sort((a, b) => b.date.localeCompare(a.date))
-  }, [refuelings, expenses, revenues, maintenances, readings, trips, checklists, search])
+  }, [baseEvents, anniversaries, search])
 
   const months = useMemo(() => {
     const map = new Map<string, { key: string; label: string; total: number; items: TimelineEvent[] }>()
     for (const e of events) {
-      const key = e.date.slice(0, 7)
+      const key = e.groupKey ?? e.date.slice(0, 7)
       const cur = map.get(key) ?? {
         key,
-        label: formatMonthYear(e.date),
+        label: formatMonthYear(`${key}-01`),
         total: 0,
         items: [],
       }
@@ -141,6 +250,28 @@ export function HistoryScreen() {
   }, [events])
 
   const fillById = (id: string) => refuelings.find((f) => f.id === id)
+
+  const insightFor = (key: string) => {
+    const current = monthStats.get(key)
+    const prevKey = [...monthStats.keys()]
+      .filter((k) => k < key)
+      .sort()
+      .at(-1)
+    const prev = prevKey ? monthStats.get(prevKey) : undefined
+    let comparison: string | null = null
+    if (current?.consumption != null && prev?.consumption) {
+      const pct = ((current.consumption - prev.consumption) / prev.consumption) * 100
+      const dir = pct >= 0 ? "au-dessus" : "en dessous"
+      const month = formatMonthName(`${prevKey}-01`)
+      const link = /^[aeiouyàâäéèêëîïôöûü]/i.test(month) ? `d'${month}` : `de ${month}`
+      comparison = `Consommation ${formatNumber(Math.abs(pct), 1)} % ${dir} ${link}`
+    }
+    const expense =
+      current?.biggest && current.biggest.amount >= 100
+        ? `Plus grosse dépense du mois : ${current.biggest.title} · ${formatMoney(current.biggest.amount)}`
+        : null
+    return { comparison, expense }
+  }
 
   return (
     <div className="pb-6">
@@ -205,47 +336,87 @@ export function HistoryScreen() {
         {months.length === 0 ? (
           <p className="px-12 py-10 text-sm text-muted">Aucun événement pour le moment.</p>
         ) : (
-          months.map((month) => (
-            <div key={month.key} className="relative mb-2">
-              <div className="relative mb-3 ml-12 mr-4">
-                <div className="absolute top-1/2 -left-[38px] h-3 w-8 -translate-y-1/2 rounded-sm bg-[#7a7a7a]" />
-                <div className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3 shadow-sm">
-                  <span className="text-[13px] font-semibold tracking-wide text-ink">
-                    {month.label}
-                  </span>
-                  <span className="text-[15px] font-bold text-ink">
-                    {formatMoney(month.total)}
-                  </span>
-                </div>
-              </div>
+          months.map((month) => {
+            const meta = monthStats.get(month.key)
+            const insight = insightFor(month.key)
+            const hasData = month.items.some((e) => e.kind !== "anniversary")
+            return (
+              <div key={month.key} className="relative mb-2">
+                {hasData ? (
+                  <div className="relative mb-3 ml-12 mr-4">
+                    <div className="absolute top-1/2 -left-[37px] h-2.5 w-6 -translate-y-1/2 rounded-full bg-[#c9c9c9]" />
+                    <div className="rounded-xl border border-black/5 bg-[#ededed] px-4 py-3">
+                      <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#9e9e9e]">
+                        {month.label}
+                      </p>
+                      <p className="mt-1 text-[16px] font-semibold leading-snug text-ink">
+                        {formatMoney(month.total)}
+                        {meta?.distance ? ` · ${formatKm(meta.distance)}` : ""}
+                        {meta?.consumption != null
+                          ? ` · ${formatDecimal(meta.consumption, 3)} L/100km`
+                          : ""}
+                      </p>
+                      {insight.comparison ? (
+                        <p className="mt-1 text-[13px] leading-snug text-[#616161]">
+                          {insight.comparison}
+                        </p>
+                      ) : null}
+                      {insight.expense ? (
+                        <p className="mt-0.5 text-[13px] leading-snug text-[#616161]">
+                          {insight.expense}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
 
               {month.items.map((event) => {
                 const fill = event.kind === "refueling" ? fillById(event.id) : undefined
                 const expanded = expandedId === event.id
+                const isAnniversary = event.kind === "anniversary"
                 return (
                   <div key={`${event.kind}-${event.id}`} className="relative mb-4">
                     <TimelineDot kind={event.kind} />
-                    <div className="ml-12 mr-4">
-                      <button
-                        type="button"
-                        className="w-full text-left"
-                        onClick={() =>
-                          setExpandedId(expanded ? null : event.id)
-                        }
-                      >
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-[16px] font-bold text-ink">{event.title}</span>
-                          {event.amount != null ? (
-                            <span className="text-[16px] font-bold text-ink">
-                              {formatMoney(event.amount)}
-                            </span>
-                          ) : null}
+                    <div className="ml-12 mr-4 border-b border-line/70 pb-3">
+                      {isAnniversary ? (
+                        <div className="flex items-start justify-between gap-3 py-1 pl-2">
+                          <p className="text-[15px] font-medium leading-snug text-ink">
+                            {event.count === 1 ? (
+                              <>Vous avez terminé une année de contrôle de votre véhicule.</>
+                            ) : (
+                              <>
+                                Vous avez complété{" "}
+                                <span className="font-bold text-teal-deep">{event.count}</span>{" "}
+                                année(s) de contrôle de votre véhicule.
+                              </>
+                            )}
+                          </p>
+                          <span className="shrink-0 pt-0.5 text-[13px] text-muted">
+                            {formatDayMonth(event.date)}
+                          </span>
                         </div>
-                        <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[12px] text-muted">
-                          <span>{event.subtitle}</span>
-                          <span>{formatDayMonth(event.date)}</span>
-                        </div>
-                      </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="w-full text-left"
+                          onClick={() =>
+                            setExpandedId(expanded ? null : event.id)
+                          }
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-[16px] font-bold text-ink">{event.title}</span>
+                            {event.amount != null ? (
+                              <span className="text-[16px] font-bold text-ink">
+                                {formatMoney(event.amount)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[12px] text-muted">
+                            <span>{event.subtitle}</span>
+                            <span>{formatDayMonth(event.date)}</span>
+                          </div>
+                        </button>
+                      )}
 
                       {expanded && fill ? (
                         <FuelDetails
@@ -263,8 +434,9 @@ export function HistoryScreen() {
                   </div>
                 )
               })}
-            </div>
-          ))
+              </div>
+            )
+          })
         )}
       </section>
     </div>
@@ -281,8 +453,21 @@ function TimelineDot({ kind }: { kind: TimelineEvent["kind"] }) {
     trip: "bg-accent-itineraire",
     checklist: "bg-accent-checklist",
     reminder: "bg-accent-rappel",
+    anniversary: "bg-teal",
   }
   const iconClass = "h-4 w-4"
+  if (kind === "anniversary") {
+    return (
+      <>
+        <div className="absolute left-[7px] top-0 z-10 grid h-8 w-8 place-items-center rounded-full bg-teal text-white shadow">
+          <Trophy className={iconClass} />
+        </div>
+        <div className="absolute left-[30px] top-[-3px] z-20 grid h-5 w-5 place-items-center rounded-full bg-[#2196f3] text-white ring-2 ring-white">
+          <Cake className="h-3 w-3" />
+        </div>
+      </>
+    )
+  }
   return (
     <div
       className={cn(

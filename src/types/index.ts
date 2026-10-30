@@ -186,6 +186,7 @@ export type TimelineKind =
   | "trip"
   | "checklist"
   | "reminder"
+  | "anniversary"
 
 export interface TimelineEvent {
   id: string
@@ -195,4 +196,8 @@ export interface TimelineEvent {
   title: string
   amount?: number
   subtitle: string
+  /** Nombre d'années complétées (événement anniversaire). */
+  count?: number
+  /** Mois de rattachement dans l'historique (par défaut le mois de la date). */
+  groupKey?: string
 }

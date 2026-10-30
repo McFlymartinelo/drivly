@@ -70,6 +70,14 @@ export function formatMonthYear(iso: string): string {
   return format(parseISO(iso), "LLLL yyyy", { locale: fr }).toUpperCase()
 }
 
+export function formatMonthName(iso: string): string {
+  return format(parseISO(iso), "LLLL", { locale: fr })
+}
+
+export function formatDecimal(n: number, maxDigits = 3): string {
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: maxDigits }).format(n)
+}
+
 export function formatShortMonth(iso: string): string {
   return format(parseISO(iso), "MMM", { locale: fr }).replace(".", "")
 }
