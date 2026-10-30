@@ -1,8 +1,10 @@
 import { ChevronDown, Download, Search, Share2 } from "lucide-react"
+import { useState } from "react"
 import { useLocation } from "react-router-dom"
 import { useApp } from "../../hooks/useApp"
 import { formatKm } from "../../utils/format"
-import { downloadJson, exportAll } from "../../utils/export"
+import { exportAll, shareOrDownloadJson } from "../../utils/export"
+import { showError, showToast } from "../../utils/toast"
 import { BrandLogo } from "../shared/BrandLogo"
 
 export function Header({
@@ -12,13 +14,29 @@ export function Header({
   onOpenVehicles: () => void
   onSearch?: () => void
 }) {
-  const { vehicle } = useApp()
+  const { vehicle, ready } = useApp()
   const location = useLocation()
   const isReports = location.pathname.startsWith("/rapports")
+  const [busy, setBusy] = useState(false)
 
   async function handleExport() {
-    const data = await exportAll()
-    downloadJson(data, `drivly-export-${new Date().toISOString().slice(0, 10)}.json`)
+    if (busy) return
+    setBusy(true)
+    try {
+      const data = await exportAll()
+      const result = await shareOrDownloadJson(
+        data,
+        `drivly-export-${new Date().toISOString().slice(0, 10)}.json`,
+      )
+      localStorage.setItem("drivly.lastExport", new Date().toISOString())
+      if (result === "shared") showToast("Sauvegarde partagée.", { tone: "success" })
+      else if (result === "downloaded") showToast("Sauvegarde exportée.", { tone: "success" })
+    } catch (error) {
+      console.error(error)
+      showError("Export impossible.")
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -37,27 +55,34 @@ export function Header({
               {vehicle?.marque ?? "Véhicule"}
             </span>
             <span className="block truncate text-[11px] leading-tight text-white/90">
-              {vehicle ? `${vehicle.nom} · ${formatKm(vehicle.kmActuel)}` : "Aucun véhicule"}
+              {!ready
+                ? "Chargement…"
+                : vehicle
+                  ? `${vehicle.nom} · ${formatKm(vehicle.kmActuel)}`
+                  : "Aucun véhicule"}
             </span>
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-90" />
         </button>
         <button
           type="button"
-          aria-label={isReports ? "Partager" : "Exporter"}
-          className="grid h-10 w-10 place-items-center"
-          onClick={handleExport}
+          aria-label={isReports ? "Partager la sauvegarde" : "Exporter la sauvegarde"}
+          className="grid h-10 w-10 place-items-center disabled:opacity-60"
+          onClick={() => void handleExport()}
+          disabled={busy}
         >
           {isReports ? <Share2 className="h-5 w-5" /> : <Download className="h-5 w-5" />}
         </button>
-        <button
-          type="button"
-          aria-label="Rechercher"
-          className="grid h-10 w-10 place-items-center"
-          onClick={onSearch}
-        >
-          <Search className="h-5 w-5" />
-        </button>
+        {onSearch ? (
+          <button
+            type="button"
+            aria-label="Rechercher"
+            className="grid h-10 w-10 place-items-center"
+            onClick={onSearch}
+          >
+            <Search className="h-5 w-5" />
+          </button>
+        ) : null}
       </div>
     </header>
   )

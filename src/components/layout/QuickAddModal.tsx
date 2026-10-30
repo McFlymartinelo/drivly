@@ -7,6 +7,7 @@ import {
   Wallet,
   Wrench,
 } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { useApp } from "../../hooks/useApp"
 
@@ -24,16 +25,34 @@ const items = [
 export function QuickAddModal() {
   const { setQuickAddOpen } = useApp()
   const navigate = useNavigate()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const first = panelRef.current?.querySelector<HTMLButtonElement>("button")
+    first?.focus()
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setQuickAddOpen(false)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [setQuickAddOpen])
 
   return (
     <div className="absolute inset-0 z-30">
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Fermer le menu"
         className="absolute inset-0 bg-black/35"
         onClick={() => setQuickAddOpen(false)}
       />
-      <div className="absolute bottom-[108px] left-1/2 w-[210px] -translate-x-1/2">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ajouter une entrée"
+        className="absolute bottom-[108px] left-1/2 w-[210px] -translate-x-1/2"
+      >
         <div className="overflow-hidden rounded-xl bg-white py-2 shadow-2xl">
           {items.map((item) => {
             const Icon = item.Icon
@@ -41,7 +60,7 @@ export function QuickAddModal() {
               <button
                 key={item.to}
                 type="button"
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] text-ink hover:bg-app"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] text-ink hover:bg-app focus-visible:bg-app"
                 onClick={() => {
                   setQuickAddOpen(false)
                   navigate(item.to)

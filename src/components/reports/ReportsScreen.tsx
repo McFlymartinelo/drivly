@@ -1,4 +1,5 @@
-import { Calendar, Fuel, Gauge, TrendingUp, Wallet } from "lucide-react"
+import { addMonths, parseISO } from "date-fns"
+import { Calendar, Download, Fuel, Gauge, TrendingUp, Wallet } from "lucide-react"
 import { useMemo, useState, type ReactNode } from "react"
 import {
   Area,
@@ -27,6 +28,7 @@ import {
   stationBreakdown,
 } from "../../utils/calculations"
 import { cn } from "../../utils/cn"
+import { downloadCsv } from "../../utils/export"
 import {
   formatConsumption,
   formatIsoDate,
@@ -35,25 +37,38 @@ import {
   formatMoney,
   formatNumber,
 } from "../../utils/format"
+import { showToast } from "../../utils/toast"
 import { Card } from "../shared/Form"
 
 const tabs = [
   { id: "general", label: "GÉNÉRAL" },
   { id: "plein", label: "PLEIN" },
   { id: "depense", label: "DÉPENSE" },
-  { id: "revenu", label: "LE REVENU" },
+  { id: "revenu", label: "REVENU" },
 ] as const
 
 type TabId = (typeof tabs)[number]["id"]
+
+type PeriodId = "all" | "12m" | "year" | "custom"
+
+const periods: Array<{ id: PeriodId; label: string }> = [
+  { id: "all", label: "Tout" },
+  { id: "12m", label: "12 mois" },
+  { id: "year", label: "Année" },
+  { id: "custom", label: "Perso" },
+]
 
 const PIE_COLORS = ["#F57C00", "#EF5350", "#8D6E63", "#43A047"]
 const STATION_COLORS = ["#66BB6A", "#26C6DA", "#EC407A", "#EF5350", "#FFA726", "#7E57C2"]
 
 export function ReportsScreen() {
-  const { refuelings, expenses, revenues, maintenances } = useApp()
+  const { ready, refuelings, expenses, revenues, maintenances } = useApp()
   const [tab, setTab] = useState<TabId>("general")
+  const [period, setPeriod] = useState<PeriodId>("all")
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
 
-  const range = useMemo(() => {
+  const dataRange = useMemo(() => {
     const dates = [
       ...refuelings.map((x) => x.date),
       ...expenses.map((x) => x.date),
@@ -66,6 +81,29 @@ export function ReportsScreen() {
     }
     return { from: dates[0], to: dates[dates.length - 1] }
   }, [refuelings, expenses, revenues, maintenances])
+
+  const range = useMemo(() => {
+    if (period === "all") return dataRange
+    if (period === "12m") {
+      const to = parseISO(dataRange.to)
+      const from = Number.isNaN(to.getTime())
+        ? parseISO(dataRange.from)
+        : addMonths(to, -12)
+      return {
+        from: (from.getTime() > parseISO(dataRange.from).getTime() ? from : parseISO(dataRange.from)).toISOString(),
+        to: dataRange.to,
+      }
+    }
+    if (period === "year") {
+      const year = dataRange.to.slice(0, 4)
+      const from = `${year}-01-01T00:00:00.000Z`
+      return { from: from > dataRange.from ? from : dataRange.from, to: dataRange.to }
+    }
+    return {
+      from: customFrom ? new Date(`${customFrom}T00:00:00`).toISOString() : dataRange.from,
+      to: customTo ? new Date(`${customTo}T23:59:59`).toISOString() : dataRange.to,
+    }
+  }, [period, dataRange, customFrom, customTo])
 
   const fills = useMemo(
     () => refuelings.filter((f) => f.date >= range.from && f.date <= range.to),
@@ -85,6 +123,90 @@ export function ReportsScreen() {
   )
 
   const count = fills.length + exps.length + revs.length + mains.length
+
+  if (!ready) {
+    return (
+      <p className="py-16 text-center text-sm text-muted" role="status">
+        Chargement des rapports…
+      </p>
+    )
+  }
+
+  function exportCsv() {
+    const rows: Array<Array<string | number>> = []
+    for (const fill of fills) {
+      rows.push([
+        formatIsoDate(fill.date),
+        "Plein",
+        fill.carburant,
+        fill.coutTotal,
+        fill.kilometrage,
+        fill.litres,
+        fill.prixAuLitre,
+        fill.station,
+      ])
+    }
+    for (const expense of exps) {
+      rows.push([
+        formatIsoDate(expense.date),
+        "Dépense",
+        expense.categorie,
+        expense.montant,
+        expense.kilometrage ?? "",
+        "",
+        "",
+        expense.notes,
+      ])
+    }
+    for (const maintenance of mains) {
+      rows.push([
+        formatIsoDate(maintenance.date),
+        "Entretien",
+        maintenance.typeEntretien,
+        maintenance.coutTotal,
+        maintenance.kilometrage,
+        "",
+        "",
+        [maintenance.typeIntervention, maintenance.referencesPieces]
+          .filter(Boolean)
+          .join(" · "),
+      ])
+    }
+    for (const revenue of revs) {
+      rows.push([
+        formatIsoDate(revenue.date),
+        "Revenu",
+        revenue.categorie,
+        revenue.montant,
+        revenue.kilometrage ?? "",
+        "",
+        "",
+        revenue.notes,
+      ])
+    }
+    rows.sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+
+    if (rows.length === 0) {
+      showToast("Aucune donnée à exporter sur cette période.", { tone: "error" })
+      return
+    }
+
+    downloadCsv(
+      `drivly-${range.from.slice(0, 10)}_${range.to.slice(0, 10)}.csv`,
+      [
+        "Date",
+        "Type",
+        "Catégorie",
+        "Montant (€)",
+        "Kilométrage",
+        "Litres",
+        "Prix/L (€)",
+        "Notes",
+      ],
+      rows,
+    )
+    showToast("Export CSV généré.", { tone: "success" })
+  }
 
   return (
     <div className="pb-8">
@@ -111,26 +233,83 @@ export function ReportsScreen() {
       </div>
 
       <div className="px-3 pt-3">
-        <div className="flex items-center justify-between rounded-full bg-white px-4 py-2.5 text-[13px] shadow-sm">
-          <span>
-            {count} entrée{count > 1 ? "s" : ""} ({formatIsoDate(range.from)} -{" "}
-            {formatIsoDate(range.to)})
-          </span>
-          <Calendar className="h-5 w-5 text-orange" />
+        <div className="rounded-xl bg-white px-3 py-2.5 text-[13px] shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate">
+              {count} entrée{count > 1 ? "s" : ""} ({formatIsoDate(range.from)} -{" "}
+              {formatIsoDate(range.to)})
+            </span>
+            <button
+              type="button"
+              className="flex shrink-0 items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-[12px] font-semibold text-teal-deep"
+              onClick={exportCsv}
+            >
+              <Download className="h-3.5 w-3.5" /> CSV
+            </button>
+          </div>
+
+          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto">
+            <Calendar className="h-4 w-4 shrink-0 text-orange" />
+            {periods.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setPeriod(item.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold",
+                  period === item.id
+                    ? "bg-teal text-white"
+                    : "bg-app text-[#616161]",
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {period === "custom" ? (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                aria-label="Date de début"
+                value={customFrom}
+                onChange={(event) => setCustomFrom(event.target.value)}
+                className="rounded-lg border border-line px-2 py-1.5 text-[12px]"
+              />
+              <input
+                type="date"
+                aria-label="Date de fin"
+                value={customTo}
+                onChange={(event) => setCustomTo(event.target.value)}
+                className="rounded-lg border border-line px-2 py-1.5 text-[12px]"
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
-      {tab === "general" ? (
+      {count === 0 ? (
+        <div className="px-3 pt-3">
+          <Card className="px-4 py-8 text-center">
+            <p className="text-sm font-semibold text-ink">Aucune donnée sur cette période</p>
+            <p className="mt-1 text-[12px] text-muted">
+              Ajoutez un plein ou une dépense, ou élargissez la période.
+            </p>
+          </Card>
+        </div>
+      ) : null}
+
+      {count > 0 && tab === "general" ? (
         <GeneralReports fills={fills} exps={exps} revs={revs} mains={mains} range={range} />
       ) : null}
-      {tab === "plein" ? <FuelReports fills={fills} all={refuelings} /> : null}
-      {tab === "depense" ? (
+      {count > 0 && tab === "plein" ? <FuelReports fills={fills} all={refuelings} /> : null}
+      {count > 0 && tab === "depense" ? (
         <SimpleMoney
           items={exps.map((e) => ({ date: e.date, montant: e.montant, label: e.categorie }))}
           color="#EF5350"
         />
       ) : null}
-      {tab === "revenu" ? (
+      {count > 0 && tab === "revenu" ? (
         <SimpleMoney
           items={revs.map((e) => ({ date: e.date, montant: e.montant, label: e.categorie }))}
           color="#43A047"
@@ -219,7 +398,7 @@ function GeneralReports({
         <Kpi
           tone="green"
           icon={<Wallet className="h-4 w-4" />}
-          title="Le revenu"
+          title="Revenus"
           value={formatMoney(totalRev)}
           lines={[
             `Par jour ${formatMoney(totalRev / days)}`,
@@ -301,6 +480,20 @@ function GeneralReports({
 function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
   const agg = aggregateFuel(fills, all)
   const stations = stationBreakdown(fills)
+
+  if (fills.length === 0) {
+    return (
+      <div className="px-3 pt-3">
+        <Card className="px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-ink">Aucun plein sur cette période</p>
+          <p className="mt-1 text-[12px] text-muted">
+            Choisissez une autre période ou enregistrez un plein.
+          </p>
+        </Card>
+      </div>
+    )
+  }
+
   const monthly = monthlyBuckets(fills, [], [], []).map((m) => ({
     ...m,
     label: m.key.slice(5),
@@ -341,7 +534,7 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
           tone="orange"
           icon={<Gauge className="h-4 w-4" />}
           title="Consommation"
-          value={formatConsumption(agg.avgConsumption)}
+          value={agg.avgConsumption > 0 ? formatConsumption(agg.avgConsumption) : "—"}
           lines={[`Min ${formatNumber(agg.minConsumption)}`, `Max ${formatNumber(agg.maxConsumption)}`]}
         />
       </div>
@@ -362,8 +555,24 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
           </div>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-orange-soft">
-          <div className="h-full w-3/4 rounded-full bg-orange" />
+          <div
+            className="h-full rounded-full bg-orange"
+            style={{
+              width: `${Math.min(
+                100,
+                Math.max(
+                  0,
+                  agg.avgIntervalKm > 0
+                    ? (agg.lastIntervalKm / agg.avgIntervalKm) * 100
+                    : 0,
+                ),
+              )}%`,
+            }}
+          />
         </div>
+        <p className="mt-1 text-[11px] text-muted">
+          Dernier intervalle rapporté à la moyenne ({formatNumber(agg.avgIntervalKm, 0)} km)
+        </p>
       </Card>
 
       <ChartCard title="Tous les volumes mensuels" iconColor="orange">
@@ -384,7 +593,9 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
         <p className="mb-1 flex items-center gap-2 text-[14px] font-semibold">
           <Gauge className="h-4 w-4 text-orange" /> Efficacité
         </p>
-        <p className="text-2xl font-bold">{formatConsumption(agg.avgConsumption)}</p>
+        <p className="text-2xl font-bold">
+          {agg.avgConsumption > 0 ? formatConsumption(agg.avgConsumption) : "—"}
+        </p>
         <RangeBar
           min={agg.minConsumption}
           max={agg.maxConsumption}
@@ -393,7 +604,9 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
           maxLabel={formatNumber(agg.maxConsumption)}
         />
         <p className="mt-4 text-sm text-muted">Coût/km</p>
-        <p className="text-xl font-bold">{formatMoney(agg.costPerKm)}</p>
+        <p className="text-xl font-bold">
+          {agg.costPerKm > 0 ? formatMoney(agg.costPerKm) : "—"}
+        </p>
         <RangeBar
           min={agg.minCostPerKm}
           max={agg.maxCostPerKm}

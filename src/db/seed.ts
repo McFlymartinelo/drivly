@@ -202,16 +202,20 @@ const initialExpenses: Array<{
 ]
 
 export async function seedIfEmpty(): Promise<void> {
+  // Migration uniquement : l'app ne charge plus de données de démonstration
+  // automatiquement (onboarding explicite côté interface).
   const existing = await db.vehicles.get(VEHICLE_ID)
   if (existing && existing.immatriculation !== PLATE) {
     await db.vehicles.update(VEHICLE_ID, { immatriculation: PLATE })
   }
 
-  // Replace legacy 12-item demo seed (kmInitial === 182162) if present
+  // Remplace l'ancien jeu de démo (12 entrées, kmInitial === 182162).
   const isLegacyDemo = existing?.kmInitial === 182162
-  const count = await db.vehicles.count()
-  if (count > 0 && !isLegacyDemo) return
+  if (isLegacyDemo) await loadDemoData()
+}
 
+/** Charge (ou recharge) la démonstration complète Citroën C4. */
+export async function loadDemoData(): Promise<void> {
   const now = new Date().toISOString()
 
   const vehicle: Vehicle = {
@@ -283,7 +287,8 @@ export async function seedIfEmpty(): Promise<void> {
     "rw",
     [db.vehicles, db.refuelings, db.maintenances, db.expenses, db.reminders],
     async () => {
-      if (isLegacyDemo) {
+      const current = await db.vehicles.get(VEHICLE_ID)
+      if (current?.kmInitial === 182162) {
         await db.vehicles.clear()
         await db.refuelings.clear()
         await db.maintenances.clear()

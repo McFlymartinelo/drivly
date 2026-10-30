@@ -22,6 +22,9 @@ import type {
 
 const STORAGE_KEY = "drivly.vehicleId"
 
+/** Référence stable pour éviter de recréer un tableau à chaque rendu. */
+const EMPTY: never[] = []
+
 interface AppContextValue {
   ready: boolean
   vehicles: Vehicle[]
@@ -45,7 +48,8 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const vehicles = useLiveQuery(() => db.vehicles.toArray()) ?? []
+  const vehiclesQuery = useLiveQuery(() => db.vehicles.toArray())
+  const vehicles = vehiclesQuery ?? EMPTY
   const [storedId, setStoredId] = useState<string | null>(() =>
     localStorage.getItem(STORAGE_KEY),
   )
@@ -70,7 +74,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.refuelings.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
   const reminders =
     useLiveQuery(
@@ -79,7 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.reminders.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
   const maintenances =
     useLiveQuery(
@@ -88,7 +92,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.maintenances.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
   const expenses =
     useLiveQuery(
@@ -97,7 +101,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.expenses.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
   const revenues =
     useLiveQuery(
@@ -106,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.revenues.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
   const readings =
     useLiveQuery(
@@ -115,7 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.readings.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
   const trips =
     useLiveQuery(
@@ -124,7 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.trips.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
   const checklists =
     useLiveQuery(
@@ -133,12 +137,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? db.checklists.where("vehicleId").equals(vehicleId).toArray()
           : [],
       [vehicleId],
-    ) ?? []
+    ) ?? EMPTY
 
-  const ready = useLiveQuery(async () => {
-    await db.vehicles.count()
-    return true
-  }) ?? false
+  const ready = vehiclesQuery !== undefined
 
   const value = useMemo(
     () => ({

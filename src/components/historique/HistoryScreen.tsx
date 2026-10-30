@@ -2,6 +2,7 @@ import { addYears, differenceInYears, parseISO } from "date-fns"
 import {
   AlarmClock,
   Cake,
+  ChevronRight,
   ClipboardCheck,
   Eye,
   FileSpreadsheet,
@@ -19,13 +20,19 @@ import { useNavigate } from "react-router-dom"
 import { db } from "../../db/db"
 import { useApp } from "../../hooks/useApp"
 import type { Refueling, TimelineEvent } from "../../types"
-import { computeRefuelingStats, computeReminderStats } from "../../utils/calculations"
+import {
+  computeRefuelingStats,
+  reminderStatus,
+  summarizeFuel,
+  type ReminderLevel,
+} from "../../utils/calculations"
 import { cn } from "../../utils/cn"
 import {
   formatConsumption,
   formatDayMonth,
   formatDecimal,
   formatKm,
+  formatKmGrouped,
   formatLitres,
   formatMoney,
   formatMonthName,
@@ -33,9 +40,21 @@ import {
   formatNumber,
   formatPricePerLitre,
 } from "../../utils/format"
+import { recomputeOdometer } from "../../utils/odometer"
+import { showToast } from "../../utils/toast"
+import { Onboarding } from "../onboarding/Onboarding"
+
+const REMINDER_TEXT: Record<ReminderLevel, string> = {
+  ok: "text-emerald-600",
+  soon: "text-orange",
+  late: "text-[#c62828]",
+}
+
 
 export function HistoryScreen() {
   const {
+    ready,
+    vehicles,
     vehicle,
     refuelings,
     reminders,
@@ -85,9 +104,41 @@ export function HistoryScreen() {
     return list
   }, [vehicle?.createdAt, refuelings, expenses, maintenances])
 
-  // Statistiques mensuelles (distance et consommation moyenne pondérée), comme
-  // le récapitulatif affiché au-dessus de chaque mois de l'historique.
+  // Récapitulatif mensuel : distance, litres et consommation sont calculés
+  // sur exactement le même périmètre (avant, ils ne couvraient pas le même
+  // mois et affichaient donc des chiffres incohérents).
   const monthStats = useMemo(() => {
+    const fillsByMonth = new Map<string, Refueling[]>()
+    for (const fill of refuelings) {
+      const key = fill.date.slice(0, 7)
+      const list = fillsByMonth.get(key)
+      if (list) list.push(fill)
+      else fillsByMonth.set(key, [fill])
+    }
+
+    const biggestByMonth = new Map<string, { title: string; amount: number }>()
+    const consider = (key: string, title: string, amount: number) => {
+      const current = biggestByMonth.get(key)
+      if (!current || amount > current.amount) {
+        biggestByMonth.set(key, { title, amount })
+      }
+    }
+    for (const expense of expenses) {
+      consider(expense.date.slice(0, 7), expense.categorie, expense.montant)
+    }
+    for (const maintenance of maintenances) {
+      consider(
+        maintenance.date.slice(0, 7),
+        maintenance.typeEntretien || "Entretien",
+        maintenance.coutTotal,
+      )
+    }
+
+    const keys = new Set<string>([
+      ...fillsByMonth.keys(),
+      ...biggestByMonth.keys(),
+    ])
+
     const map = new Map<
       string,
       {
@@ -96,41 +147,19 @@ export function HistoryScreen() {
         biggest: { title: string; amount: number } | null
       }
     >()
-    const keys = new Set<string>()
-    for (const f of refuelings) keys.add(f.date.slice(0, 7))
-    for (const e of expenses) keys.add(e.date.slice(0, 7))
-    for (const m of maintenances) keys.add(m.date.slice(0, 7))
 
     for (const key of keys) {
-      const fills = refuelings.filter((f) => f.date.slice(0, 7) === key)
-      let distanceSum = 0
-      let litresSum = 0
-      for (const f of fills) {
-        const stats = computeRefuelingStats(f, refuelings, vehicle)
-        if (stats.distance != null && stats.consommation != null) {
-          distanceSum += stats.distance
-          litresSum += f.litres
-        }
-      }
-      const km = fills.map((f) => f.kilometrage)
-      const biggest = [
-        ...expenses
-          .filter((e) => e.date.slice(0, 7) === key)
-          .map((e) => ({ title: e.categorie, amount: e.montant })),
-        ...maintenances
-          .filter((m) => m.date.slice(0, 7) === key)
-          .map((m) => ({ title: m.typeEntretien || "Entretien", amount: m.coutTotal })),
-      ].sort((a, b) => b.amount - a.amount)[0] ?? null
-
+      const fills = fillsByMonth.get(key) ?? []
+      const summary = summarizeFuel(fills, refuelings)
       map.set(key, {
-        distance: km.length >= 2 ? Math.max(...km) - Math.min(...km) : null,
-        consumption:
-          distanceSum > 0 ? (litresSum / distanceSum) * 100 : null,
-        biggest,
+        distance: summary.distance,
+        consumption: summary.consumption,
+        biggest: biggestByMonth.get(key) ?? null,
       })
     }
     return map
-  }, [refuelings, expenses, maintenances, vehicle])
+  }, [refuelings, expenses, maintenances])
+
 
   const baseEvents = useMemo(() => {
     const list: TimelineEvent[] = []
@@ -199,12 +228,13 @@ export function HistoryScreen() {
       })
     }
     for (const c of checklists) {
+      const items = Array.isArray(c.items) ? c.items : []
       list.push({
         id: c.id,
         kind: "checklist",
         date: c.date,
         title: c.titre,
-        subtitle: `${c.items.filter((i) => i.done).length}/${c.items.length} faits`,
+        subtitle: `${items.filter((i) => i.done).length}/${items.length} faits`,
       })
     }
     return list
@@ -251,6 +281,16 @@ export function HistoryScreen() {
 
   const fillById = (id: string) => refuelings.find((f) => f.id === id)
 
+  if (!ready) {
+    return (
+      <div className="grid place-items-center py-16 text-sm text-muted" role="status">
+        Chargement du carnet…
+      </div>
+    )
+  }
+
+  if (vehicles.length === 0) return <Onboarding />
+
   const insightFor = (key: string) => {
     const current = monthStats.get(key)
     const prevKey = [...monthStats.keys()]
@@ -284,17 +324,31 @@ export function HistoryScreen() {
         ) : (
           <div className="space-y-2">
             {openReminders.map((r) => {
-              const stats = computeReminderStats(r, vehicle?.kmActuel ?? 0)
+              const status = reminderStatus(r, vehicle?.kmActuel ?? 0)
               return (
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => navigate("/rappels")}
+                  onClick={() => navigate(`/entree/reminder/${r.id}`)}
                   className="flex w-full overflow-hidden rounded-xl border border-line bg-white text-left shadow-sm"
                 >
-                  <span className="w-1.5 bg-orange" />
+                  <span
+                    className={cn(
+                      "w-1.5",
+                      status.level === "late"
+                        ? "bg-[#c62828]"
+                        : status.level === "soon"
+                          ? "bg-orange"
+                          : "bg-teal",
+                    )}
+                  />
                   <span className="flex flex-1 items-center gap-3 px-3 py-2.5">
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-orange text-white">
+                    <span
+                      className={cn(
+                        "grid h-10 w-10 place-items-center rounded-full text-white",
+                        status.level === "late" ? "bg-[#c62828]" : "bg-orange",
+                      )}
+                    >
                       <Fuel className="h-5 w-5" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -302,24 +356,29 @@ export function HistoryScreen() {
                         {r.titre}
                       </span>
                       <span className="block text-[12px] text-muted">
-                        {r.kmEcheance != null ? formatKm(r.kmEcheance) : "—"}
+                        {r.kmEcheance != null ? formatKmGrouped(r.kmEcheance) : "—"}
                         {r.dateEcheance ? ` · ${formatDayMonth(r.dateEcheance)}` : ""}
                       </span>
                       <span className="mt-0.5 flex items-center gap-1 text-[12px]">
-                        <AlarmClock className="h-3.5 w-3.5 text-emerald-600" />
-                        {stats.kmRestants != null ? (
-                          <span className="text-emerald-600">
-                            Dans {formatKm(Math.max(0, stats.kmRestants))}
+                        <AlarmClock
+                          className={cn("h-3.5 w-3.5", REMINDER_TEXT[status.level])}
+                        />
+                        {status.kmText ? (
+                          <span className={REMINDER_TEXT[status.level]}>
+                            {status.kmText}
                           </span>
                         ) : null}
-                        {stats.joursRestants != null ? (
-                          <span className="text-orange">
-                            · Dans {stats.joursRestants} jour
-                            {stats.joursRestants > 1 ? "s" : ""}
+                        {status.kmText && status.daysText ? (
+                          <span className="text-muted">·</span>
+                        ) : null}
+                        {status.daysText ? (
+                          <span className={REMINDER_TEXT[status.level]}>
+                            {status.daysText}
                           </span>
                         ) : null}
                       </span>
                     </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
                   </span>
                 </button>
               )
@@ -399,9 +458,13 @@ export function HistoryScreen() {
                         <button
                           type="button"
                           className="w-full text-left"
-                          onClick={() =>
-                            setExpandedId(expanded ? null : event.id)
-                          }
+                          onClick={() => {
+                            if (event.kind === "refueling") {
+                              setExpandedId(expanded ? null : event.id)
+                            } else {
+                              navigate(`/entree/${event.kind}/${event.id}`)
+                            }
+                          }}
                         >
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="text-[16px] font-bold text-ink">{event.title}</span>
@@ -413,7 +476,12 @@ export function HistoryScreen() {
                           </div>
                           <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[12px] text-muted">
                             <span>{event.subtitle}</span>
-                            <span>{formatDayMonth(event.date)}</span>
+                            <span className="flex items-center gap-0.5">
+                              {formatDayMonth(event.date)}
+                              {event.kind !== "refueling" ? (
+                                <ChevronRight className="h-3 w-3" />
+                              ) : null}
+                            </span>
                           </div>
                         </button>
                       )}
@@ -423,8 +491,23 @@ export function HistoryScreen() {
                           fill={fill}
                           fills={refuelings}
                           onDelete={async () => {
-                            await db.refuelings.delete(fill.id)
-                            setExpandedId(null)
+                            try {
+                              await db.refuelings.delete(fill.id)
+                              await recomputeOdometer(fill.vehicleId)
+                              setExpandedId(null)
+                              showToast("Plein supprimé.", {
+                                actionLabel: "Annuler",
+                                duration: 7000,
+                                onAction: () => {
+                                  void db.refuelings
+                                    .put(fill)
+                                    .then(() => recomputeOdometer(fill.vehicleId))
+                                },
+                              })
+                            } catch (error) {
+                              console.error(error)
+                              showToast("Suppression impossible.", { tone: "error" })
+                            }
                           }}
                           onEdit={() => navigate(`/plein/${fill.id}/edit`)}
                           onView={() => navigate(`/plein/${fill.id}`)}
@@ -515,7 +598,7 @@ function FuelDetails({
       <DetailRow
         label="Consommation"
         value={
-          stats.consommation != null ? formatConsumption(stats.consommation) : "0 L/100km"
+          stats.consommation != null ? formatConsumption(stats.consommation) : "—"
         }
         info
       />

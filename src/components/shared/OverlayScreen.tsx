@@ -45,10 +45,12 @@ export function SaveBar({
   onSubmit,
   label = "ENREGISTRER",
   color = "orange",
+  disabled = false,
 }: {
   onSubmit: (e: FormEvent) => void
   label?: string
   color?: "orange" | "teal"
+  disabled?: boolean
 }) {
   return (
     <form
@@ -57,7 +59,8 @@ export function SaveBar({
     >
       <button
         type="submit"
-        className={`w-full rounded-full py-3.5 text-[15px] font-bold tracking-wide text-white shadow-md ${
+        disabled={disabled}
+        className={`w-full rounded-full py-3.5 text-[15px] font-bold tracking-wide text-white shadow-md disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${
           color === "orange" ? "bg-orange" : "bg-teal"
         }`}
       >

@@ -10,6 +10,16 @@ import type {
   Vehicle,
 } from "../types"
 
+const kmNumber = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 })
+
+function dayDiff(fromIso: string, toIso: string): number | null {
+  const from = parseISO(fromIso)
+  const to = parseISO(toIso)
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null
+  return differenceInCalendarDays(to, from)
+}
+
+/** Dernier plein complet strictement antérieur au plein courant. */
 export function previousFullTank(
   fills: Refueling[],
   current: Refueling,
@@ -26,23 +36,105 @@ export function previousFullTank(
     .sort((a, b) => b.date.localeCompare(a.date) || b.kilometrage - a.kilometrage)[0]
 }
 
+export interface FillMetrics {
+  /** Distance parcourue depuis le plein précédent (tous pleins confondus). */
+  kmSincePrev: number | null
+  /** Jours écoulés depuis le plein précédent. */
+  daysSincePrev: number | null
+  /** Distance de référence : segment entre deux pleins complets, sinon delta. */
+  distance: number | null
+  /** Consommation réelle en L/100 km, uniquement sur un plein complet. */
+  consumption: number | null
+  /** Coût au km sur le même périmètre que `distance`. */
+  costPerKm: number | null
+  /** Litres cumulés depuis le dernier plein complet. */
+  segmentLitres: number | null
+  /** Coût cumulé depuis le dernier plein complet. */
+  segmentCost: number | null
+}
+
+const metricsCache = new WeakMap<Refueling[], Map<string, FillMetrics>>()
+
+/**
+ * Calcule les métriques de chaque plein en une passe.
+ *
+ * Les pleins partiels ne permettent pas de calculer une consommation : leurs
+ * litres sont reportés au prochain plein complet. La consommation n'est donc
+ * affichée que lorsque le réservoir est rempli, sur le segment complet
+ * (dernier plein complet -> plein courant).
+ */
+export function fuelMetrics(fills: Refueling[]): Map<string, FillMetrics> {
+  const cached = metricsCache.get(fills)
+  if (cached) return cached
+
+  const sorted = [...fills].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.kilometrage - b.kilometrage,
+  )
+  const map = new Map<string, FillMetrics>()
+  let prev: Refueling | undefined
+  let lastFull: Refueling | undefined
+  let accLitres = 0
+  let accCost = 0
+
+  for (const fill of sorted) {
+    const kmSincePrev =
+      prev && fill.kilometrage > prev.kilometrage
+        ? fill.kilometrage - prev.kilometrage
+        : null
+    const daysSincePrev = prev ? dayDiff(prev.date, fill.date) : null
+
+    const metrics: FillMetrics = {
+      kmSincePrev,
+      daysSincePrev,
+      distance: kmSincePrev,
+      consumption: null,
+      costPerKm:
+        kmSincePrev != null && kmSincePrev > 0
+          ? fill.coutTotal / kmSincePrev
+          : null,
+      segmentLitres: null,
+      segmentCost: null,
+    }
+
+    if (lastFull) {
+      accLitres += fill.litres
+      accCost += fill.coutTotal
+    }
+
+    if (fill.pleinComplet && lastFull) {
+      const segment = fill.kilometrage - lastFull.kilometrage
+      if (segment > 0 && accLitres > 0) {
+        metrics.distance = segment
+        metrics.consumption = (accLitres / segment) * 100
+        metrics.costPerKm = accCost / segment
+        metrics.segmentLitres = accLitres
+        metrics.segmentCost = accCost
+      }
+    }
+
+    if (fill.pleinComplet) {
+      lastFull = fill
+      accLitres = 0
+      accCost = 0
+    }
+
+    prev = fill
+    map.set(fill.id, metrics)
+  }
+
+  metricsCache.set(fills, map)
+  return map
+}
+
 export function computeRefuelingStats(
   fill: Refueling,
   fills: Refueling[],
   vehicle?: Vehicle,
 ): RefuelingStats {
-  const prev = previousFullTank(fills, fill)
-  const distance =
-    prev && fill.kilometrage > prev.kilometrage
-      ? fill.kilometrage - prev.kilometrage
-      : null
-
-  const consommation =
-    distance && distance > 0 ? (fill.litres / distance) * 100 : null
-
-  const coutParKm =
-    distance && distance > 0 ? fill.coutTotal / distance : null
-
+  const metrics = fuelMetrics(fills).get(fill.id)
+  const distance = metrics?.distance ?? null
+  const consommation = metrics?.consumption ?? null
+  const coutParKm = metrics?.costPerKm ?? null
   const pourcentageReservoir =
     vehicle && vehicle.capaciteReservoir > 0
       ? Math.min(100, (fill.litres / vehicle.capaciteReservoir) * 100)
@@ -58,10 +150,62 @@ export function computeReminderStats(
 ): ReminderStats {
   const kmRestants =
     reminder.kmEcheance != null ? reminder.kmEcheance - kmActuel : null
-  const joursRestants = reminder.dateEcheance
-    ? differenceInCalendarDays(parseISO(reminder.dateEcheance), from)
-    : null
+  const date = reminder.dateEcheance ? parseISO(reminder.dateEcheance) : null
+  const joursRestants =
+    date && !Number.isNaN(date.getTime())
+      ? differenceInCalendarDays(date, from)
+      : null
   return { kmRestants, joursRestants }
+}
+
+export type ReminderLevel = "ok" | "soon" | "late"
+
+export interface ReminderStatus {
+  level: ReminderLevel
+  kmText: string | null
+  daysText: string | null
+}
+
+/**
+ * Statut lisible d'un rappel : gère les échéances dépassées au lieu de les
+ * afficher comme « dans 0 km » ou « dans -12 jours ».
+ */
+export function reminderStatus(
+  reminder: Reminder,
+  kmActuel: number,
+  from = new Date(),
+): ReminderStatus {
+  const { kmRestants, joursRestants } = computeReminderStats(reminder, kmActuel, from)
+
+  let kmText: string | null = null
+  let daysText: string | null = null
+  let level: ReminderLevel = "ok"
+
+  if (kmRestants != null) {
+    if (kmRestants < 0) {
+      kmText = `Dépassé de ${kmNumber.format(Math.abs(Math.round(kmRestants)))} km`
+      level = "late"
+    } else {
+      kmText = `Dans ${kmNumber.format(Math.round(kmRestants))} km`
+      if (kmRestants <= 1000) level = "soon"
+    }
+  }
+
+  if (joursRestants != null) {
+    if (joursRestants < 0) {
+      const n = Math.abs(joursRestants)
+      daysText = `En retard de ${n} jour${n > 1 ? "s" : ""}`
+      level = "late"
+    } else if (joursRestants === 0) {
+      daysText = "Aujourd'hui"
+      if (level !== "late") level = "soon"
+    } else {
+      daysText = `Dans ${joursRestants} jour${joursRestants > 1 ? "s" : ""}`
+      if (joursRestants <= 30 && level !== "late") level = "soon"
+    }
+  }
+
+  return { level, kmText, daysText }
 }
 
 export function inRange(iso: string, from: string, to: string): boolean {
@@ -119,33 +263,39 @@ export function aggregateFuel(
   }
   if (fills.length === 0) return empty
 
+  const metrics = fuelMetrics(allFills)
   const totalCost = fills.reduce((s, f) => s + f.coutTotal, 0)
   const totalLitres = fills.reduce((s, f) => s + f.litres, 0)
   const prices = fills.map((f) => f.prixAuLitre)
   const costs = fills.map((f) => f.coutTotal)
   const litres = fills.map((f) => f.litres)
 
-  const sorted = [...fills].sort((a, b) => a.date.localeCompare(b.date))
-  const first = sorted[0]
-  const last = sorted[sorted.length - 1]
-  const distance = Math.max(0, last.kilometrage - first.kilometrage)
+  const kms = fills.map((f) => f.kilometrage)
+  const distance = Math.max(0, Math.max(...kms) - Math.min(...kms))
 
+  // Consommation pondérée : litres réellement consommés / distance réelle.
+  let segmentLitres = 0
+  let segmentDistance = 0
   const consumptions: number[] = []
   const costPerKms: number[] = []
   const intervalsKm: number[] = []
   const intervalsDays: number[] = []
 
+  const sorted = [...fills].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.kilometrage - b.kilometrage,
+  )
+
   for (const fill of sorted) {
-    const stats = computeRefuelingStats(fill, allFills)
-    if (stats.consommation != null) consumptions.push(stats.consommation)
-    if (stats.coutParKm != null) costPerKms.push(stats.coutParKm)
-    if (stats.distance != null) intervalsKm.push(stats.distance)
-    const prev = previousFullTank(allFills, fill)
-    if (prev) {
-      intervalsDays.push(
-        differenceInCalendarDays(parseISO(fill.date), parseISO(prev.date)),
-      )
+    const m = metrics.get(fill.id)
+    if (!m) continue
+    if (m.consumption != null && m.segmentLitres != null && m.distance != null) {
+      consumptions.push(m.consumption)
+      segmentLitres += m.segmentLitres
+      segmentDistance += m.distance
     }
+    if (m.costPerKm != null) costPerKms.push(m.costPerKm)
+    if (m.kmSincePrev != null) intervalsKm.push(m.kmSincePrev)
+    if (m.daysSincePrev != null) intervalsDays.push(m.daysSincePrev)
   }
 
   const avg = (xs: number[]) =>
@@ -163,7 +313,8 @@ export function aggregateFuel(
     minLitres: Math.min(...litres),
     maxLitres: Math.max(...litres),
     distance,
-    avgConsumption: avg(consumptions),
+    avgConsumption:
+      segmentDistance > 0 ? (segmentLitres / segmentDistance) * 100 : 0,
     minConsumption: consumptions.length ? Math.min(...consumptions) : 0,
     maxConsumption: consumptions.length ? Math.max(...consumptions) : 0,
     costPerKm: distance > 0 ? totalCost / distance : 0,
@@ -172,6 +323,25 @@ export function aggregateFuel(
     avgIntervalKm: avg(intervalsKm),
     avgIntervalDays: avg(intervalsDays),
     lastIntervalKm: intervalsKm.at(-1) ?? 0,
+  }
+}
+
+/**
+ * Résumé carburant sur un ensemble de pleins (typiquement un mois) : distance,
+ * litres et consommation sont calculés sur exactement le même périmètre.
+ */
+export function summarizeFuel(fills: Refueling[], allFills: Refueling[]) {
+  const metrics = fuelMetrics(allFills)
+  let distance = 0
+  let litres = 0
+  for (const fill of fills) {
+    litres += fill.litres
+    distance += metrics.get(fill.id)?.kmSincePrev ?? 0
+  }
+  return {
+    distance: distance > 0 ? distance : null,
+    litres,
+    consumption: distance > 0 ? (litres / distance) * 100 : null,
   }
 }
 
@@ -200,26 +370,45 @@ export function monthlyBuckets(
   maintenances: Maintenance[],
   revenues: Revenue[],
 ) {
-  const keys = new Set<string>()
   const monthKey = (iso: string) => iso.slice(0, 7)
+  type Bucket = {
+    key: string
+    plein: number
+    depense: number
+    entretien: number
+    revenu: number
+    litres: number
+  }
+  const map = new Map<string, Bucket>()
+  const bucket = (key: string) => {
+    const cur = map.get(key) ?? {
+      key,
+      plein: 0,
+      depense: 0,
+      entretien: 0,
+      revenu: 0,
+      litres: 0,
+    }
+    map.set(key, cur)
+    return cur
+  }
 
-  for (const x of fills) keys.add(monthKey(x.date))
-  for (const x of expenses) keys.add(monthKey(x.date))
-  for (const x of maintenances) keys.add(monthKey(x.date))
-  for (const x of revenues) keys.add(monthKey(x.date))
+  for (const f of fills) {
+    const b = bucket(monthKey(f.date))
+    b.plein += f.coutTotal
+    b.litres += f.litres
+  }
+  for (const e of expenses) bucket(monthKey(e.date)).depense += e.montant
+  for (const m of maintenances) bucket(monthKey(m.date)).entretien += m.coutTotal
+  for (const r of revenues) bucket(monthKey(r.date)).revenu += r.montant
 
-  return [...keys].sort().map((key) => ({
-    key,
-    plein: fills.filter((f) => monthKey(f.date) === key).reduce((s, f) => s + f.coutTotal, 0),
-    depense: expenses.filter((f) => monthKey(f.date) === key).reduce((s, f) => s + f.montant, 0),
-    entretien: maintenances.filter((f) => monthKey(f.date) === key).reduce((s, f) => s + f.coutTotal, 0),
-    revenu: revenues.filter((f) => monthKey(f.date) === key).reduce((s, f) => s + f.montant, 0),
-    litres: fills.filter((f) => monthKey(f.date) === key).reduce((s, f) => s + f.litres, 0),
-  }))
+  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key))
 }
 
 export function periodDays(fromIso: string, toIso: string): number {
-  return Math.max(1, differenceInCalendarDays(parseISO(toIso), parseISO(fromIso)) + 1)
+  const diff = dayDiff(fromIso, toIso)
+  if (diff == null) return 1
+  return Math.max(1, diff + 1)
 }
 
 export function lastOdometer(fills: Refueling[], fallback: number): number {

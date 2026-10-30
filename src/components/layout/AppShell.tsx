@@ -27,6 +27,8 @@ export function AppShell() {
         <div className="border-b border-line bg-white px-3 py-2">
           <input
             autoFocus
+            type="search"
+            aria-label="Rechercher dans l'historique"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher une station, un type…"

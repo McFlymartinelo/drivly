@@ -1,13 +1,9 @@
-import { useState } from "react"
+import { Pencil, Plus } from "lucide-react"
 import { useNavigate } from "react-router-dom"
-import type { BrandEntry } from "../../brands/catalog"
-import { resolveBrand } from "../../brands/resolve"
-import { db } from "../../db/db"
 import { useApp } from "../../hooks/useApp"
-import { uid } from "../../utils/cn"
 import { formatKm } from "../../utils/format"
 import { BrandLogo } from "../shared/BrandLogo"
-import { BrandPicker } from "../shared/BrandPicker"
+import { Modal } from "../shared/Modal"
 
 export function VehicleSwitcher({
   open,
@@ -17,111 +13,78 @@ export function VehicleSwitcher({
   onClose: () => void
 }) {
   const { vehicles, vehicleId, setVehicleId } = useApp()
-  const [creating, setCreating] = useState(false)
-  const [nom, setNom] = useState("")
-  const [brand, setBrand] = useState<BrandEntry | null>(null)
   const navigate = useNavigate()
 
-  if (!open) return null
-
-  async function addVehicle() {
-    const name = nom.trim()
-    if (!name) return
-    const inferred = brand ?? resolveBrand(name)
-    const marque = inferred?.name ?? (name.split(" ")[0] ?? name)
-    const modele = inferred
-      ? name
-      : name.split(" ").slice(1).join(" ") || name
-    const displayName = inferred ? `${inferred.name} ${name}`.trim() : name
-    const id = uid()
-    await db.vehicles.add({
-      id,
-      nom: displayName,
-      marque,
-      modele,
-      immatriculation: "",
-      kmInitial: 0,
-      kmActuel: 0,
-      carburantDefaut: "Diesel",
-      capaciteReservoir: 50,
-      createdAt: new Date().toISOString(),
-    })
-    setVehicleId(id)
-    setNom("")
-    setBrand(null)
-    setCreating(false)
-    onClose()
-  }
-
   return (
-    <div className="absolute inset-0 z-50">
-      <button type="button" className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Fermer" />
-      <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white p-4 pb-[calc(16px+env(safe-area-inset-bottom))] shadow-2xl">
-        <p className="mb-3 text-sm font-bold text-ink">Véhicules</p>
-        <div className="space-y-2">
-          {vehicles.map((v) => (
+    <Modal open={open} onClose={onClose} title="Véhicules">
+      <div className="space-y-2">
+        {vehicles.length === 0 ? (
+          <p className="text-sm text-muted">Aucun véhicule enregistré.</p>
+        ) : null}
+        {vehicles.map((vehicle) => (
+          <div
+            key={vehicle.id}
+            className={`flex items-center gap-2 rounded-xl px-3 py-2 ${
+              vehicle.id === vehicleId ? "bg-teal-soft" : "bg-app"
+            }`}
+          >
             <button
-              key={v.id}
               type="button"
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left ${
-                v.id === vehicleId ? "bg-teal-soft" : "bg-app"
-              }`}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
               onClick={() => {
-                setVehicleId(v.id)
+                setVehicleId(vehicle.id)
                 onClose()
               }}
             >
-              <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-white p-1.5 text-teal shadow-sm">
-                <BrandLogo marque={v.marque} className="h-7 w-7" />
+              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white p-1.5 text-teal shadow-sm">
+                <BrandLogo marque={vehicle.marque} className="h-7 w-7" />
               </span>
-              <span>
-                <span className="block font-semibold">{v.marque || v.nom}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">
+                  {vehicle.marque || vehicle.nom}
+                </span>
                 <span className="block text-xs text-muted">
-                  {v.nom} · {formatKm(v.kmActuel)}
+                  {vehicle.nom} · {formatKm(vehicle.kmActuel)}
                 </span>
               </span>
             </button>
-          ))}
-        </div>
-        {creating ? (
-          <div className="mt-3 space-y-2">
-            <BrandPicker value={brand} onChange={setBrand} />
-            <div className="flex gap-2">
-              <input
-                value={nom}
-                onChange={(e) => setNom(e.target.value)}
-                placeholder={brand ? "Modèle (ex. C4)" : "Nom du véhicule"}
-                className="flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-teal"
-              />
-              <button
-                type="button"
-                onClick={() => void addVehicle()}
-                className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
-              >
-                OK
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label={`Modifier ${vehicle.nom}`}
+              className="grid h-9 w-9 place-items-center text-muted"
+              onClick={() => {
+                onClose()
+                navigate(`/vehicule/${vehicle.id}`)
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
           </div>
-        ) : (
-          <button
-            type="button"
-            className="mt-3 w-full rounded-lg bg-teal py-2.5 text-sm font-semibold text-white"
-            onClick={() => setCreating(true)}
-          >
-            Ajouter un véhicule
-          </button>
-        )}
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-2">
         <button
           type="button"
-          className="mt-2 w-full py-2 text-sm text-muted"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-teal py-3 text-[14px] font-semibold text-white"
+          onClick={() => {
+            onClose()
+            navigate("/vehicule/nouveau")
+          }}
+        >
+          <Plus className="h-4 w-4" /> Ajouter un véhicule
+        </button>
+        <button
+          type="button"
+          className="w-full py-2 text-sm text-muted"
           onClick={() => {
             onClose()
             navigate("/plus")
           }}
         >
-          Gérer
+          Gérer les véhicules et les données
         </button>
       </div>
-    </div>
+    </Modal>
   )
 }

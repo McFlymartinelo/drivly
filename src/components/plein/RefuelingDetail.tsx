@@ -21,6 +21,8 @@ import {
   formatLitres,
   formatMoney,
 } from "../../utils/format"
+import { recomputeOdometer } from "../../utils/odometer"
+import { showToast } from "../../utils/toast"
 import { Card } from "../shared/Form"
 import { FuelCan, SectionLabel } from "../shared/Icons"
 import { OverlayScreen } from "../shared/OverlayScreen"
@@ -43,11 +45,28 @@ export function RefuelingDetail() {
 
   const stats = computeRefuelingStats(fill, refuelings, vehicle)
   const fillId = fill.id
+  const snapshot = fill
+  const vehicleId = fill.vehicleId
 
   async function remove() {
-    if (!confirm("Supprimer ce plein ?")) return
-    await db.refuelings.delete(fillId)
-    navigate("/", { replace: true })
+    try {
+      await db.refuelings.delete(fillId)
+      await recomputeOdometer(vehicleId)
+      navigate("/", { replace: true })
+      showToast("Plein supprimé.", {
+        actionLabel: "Annuler",
+        duration: 7000,
+        onAction: () => {
+          void db.refuelings
+            .put(snapshot)
+            .then(() => recomputeOdometer(vehicleId))
+            .then(() => showToast("Suppression annulée.", { tone: "success" }))
+        },
+      })
+    } catch (error) {
+      console.error(error)
+      showToast("Suppression impossible.", { tone: "error" })
+    }
   }
 
   function go(delta: number) {

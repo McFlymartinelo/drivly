@@ -1,6 +1,6 @@
 import { Banknote, CalendarClock, Car, Gauge, MapPin, StickyNote, Wrench } from "lucide-react"
-import { useState, type FormEvent } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useRef, useState, type FormEvent } from "react"
+import { useNavigate, useParams } from "react-router-dom"
 import { db } from "../../db/db"
 import { useApp } from "../../hooks/useApp"
 import {
@@ -14,7 +14,9 @@ import {
   type RevenueCategory,
 } from "../../types"
 import { uid } from "../../utils/cn"
-import { parseDecimal } from "../../utils/format"
+import { toDateInputValue, toTimeInputValue, parseDecimal } from "../../utils/format"
+import { raiseOdometer } from "../../utils/odometer"
+import { showError } from "../../utils/toast"
 import { FormRow, UnderlineField, UnderlineSelect } from "../shared/Form"
 import { OverlayScreen, SaveBar } from "../shared/OverlayScreen"
 
@@ -30,8 +32,38 @@ function toIso(date: string, time: string) {
   return new Date(`${date}T${time || "12:00"}`).toISOString()
 }
 
+function useEntry<T extends { id: string }>(items: T[], id: string | undefined) {
+  return id ? items.find((item) => item.id === id) : undefined
+}
+
+/**
+ * Complète un champ numérique avec la valeur par défaut dès qu'elle est
+ * disponible (les données IndexedDB arrivent après le premier rendu), sans
+ * jamais écraser une saisie de l'utilisateur.
+ */
+function useHydratedNumber(
+  value: number | undefined,
+  setValue: (value: string) => void,
+  enabled = true,
+) {
+  const touched = useRef(false)
+
+  useEffect(() => {
+    if (!enabled || touched.current) return
+    if (value == null || value <= 0) return
+    setValue(String(value))
+  }, [enabled, value, setValue])
+
+  return () => {
+    touched.current = true
+  }
+}
+
+
 export function ExpenseForm() {
-  const { vehicle } = useApp()
+  const { id } = useParams<{ id: string }>()
+  const { vehicle, expenses } = useApp()
+  const existing = useEntry(expenses, id)
   const navigate = useNavigate()
   const init = useNow()
   const [date, setDate] = useState(init.date)
@@ -40,27 +72,54 @@ export function ExpenseForm() {
   const [montant, setMontant] = useState("")
   const [km, setKm] = useState(String(vehicle?.kmActuel ?? ""))
   const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!existing) return
+    setDate(toDateInputValue(existing.date))
+    setTime(toTimeInputValue(existing.date))
+    setCategorie(existing.categorie)
+    setMontant(String(existing.montant).replace(".", ","))
+    setKm(existing.kilometrage != null ? String(existing.kilometrage) : "")
+    setNotes(existing.notes)
+  }, [existing])
+
+  const touchKm = useHydratedNumber(vehicle?.kmActuel, setKm, !existing)
+
+  const amount = parseDecimal(montant)
+  const canSave = amount != null && !saving && (!id || Boolean(existing))
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!vehicle) return
-    const amount = parseDecimal(montant)
-    if (amount == null) return
-    await db.expenses.add({
-      id: uid(),
-      vehicleId: vehicle.id,
-      date: toIso(date, time),
-      kilometrage: Number(km) || undefined,
-      categorie,
-      montant: amount,
-      notes,
-      createdAt: new Date().toISOString(),
-    })
-    navigate("/")
+    if (!vehicle || amount == null || !canSave) return
+    setSaving(true)
+    const kilometrage = parseDecimal(km)
+    try {
+      await db.expenses.put({
+        id: existing?.id ?? uid(),
+        vehicleId: existing?.vehicleId ?? vehicle.id,
+        date: toIso(date, time),
+        kilometrage: kilometrage != null ? Math.round(kilometrage) : undefined,
+        categorie,
+        montant: amount,
+        notes,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      })
+      await raiseOdometer(existing?.vehicleId ?? vehicle.id, kilometrage)
+      if (existing) navigate(-1)
+      else navigate("/")
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
+    }
   }
 
   return (
-    <OverlayScreen title="Dépense" footer={<SaveBar onSubmit={(e) => void save(e)} />}>
+    <OverlayScreen
+      title={existing ? "Modifier la dépense" : "Dépense"}
+      footer={<SaveBar disabled={!canSave} onSubmit={(e) => void save(e)} />}
+    >
       <FormRow icon={<Car className="h-5 w-5" />}>
         <UnderlineField label="Véhicule" value={vehicle ? `${vehicle.marque} (${vehicle.nom})` : ""} readOnly />
       </FormRow>
@@ -79,9 +138,10 @@ export function ExpenseForm() {
       </FormRow>
       <FormRow icon={<Banknote className="h-5 w-5" />}>
         <UnderlineField label="Montant" inputMode="decimal" value={montant} onChange={(e) => setMontant(e.target.value)} />
+        {amount == null ? <p className="mt-1 text-[12px] text-muted">Montant requis.</p> : null}
       </FormRow>
       <FormRow icon={<Gauge className="h-5 w-5" />}>
-        <UnderlineField label="Compteur kilométrique" inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value)} />
+        <UnderlineField label="Compteur kilométrique" inputMode="numeric" value={km} onChange={(e) => { touchKm(); setKm(e.target.value) }} />
       </FormRow>
       <FormRow icon={<StickyNote className="h-5 w-5" />}>
         <UnderlineField label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -91,7 +151,9 @@ export function ExpenseForm() {
 }
 
 export function RevenueForm() {
-  const { vehicle } = useApp()
+  const { id } = useParams<{ id: string }>()
+  const { vehicle, revenues } = useApp()
+  const existing = useEntry(revenues, id)
   const navigate = useNavigate()
   const init = useNow()
   const [date, setDate] = useState(init.date)
@@ -99,26 +161,49 @@ export function RevenueForm() {
   const [categorie, setCategorie] = useState<RevenueCategory>("Remboursement")
   const [montant, setMontant] = useState("")
   const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!existing) return
+    setDate(toDateInputValue(existing.date))
+    setTime(toTimeInputValue(existing.date))
+    setCategorie(existing.categorie)
+    setMontant(String(existing.montant).replace(".", ","))
+    setNotes(existing.notes)
+  }, [existing])
+
+  const amount = parseDecimal(montant)
+  const canSave = amount != null && !saving && (!id || Boolean(existing))
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!vehicle) return
-    const amount = parseDecimal(montant)
-    if (amount == null) return
-    await db.revenues.add({
-      id: uid(),
-      vehicleId: vehicle.id,
-      date: toIso(date, time),
-      categorie,
-      montant: amount,
-      notes,
-      createdAt: new Date().toISOString(),
-    })
-    navigate("/")
+    if (!vehicle || amount == null || !canSave) return
+    setSaving(true)
+    try {
+      await db.revenues.put({
+        id: existing?.id ?? uid(),
+        vehicleId: existing?.vehicleId ?? vehicle.id,
+        date: toIso(date, time),
+        categorie,
+        montant: amount,
+        notes,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      })
+      if (existing) navigate(-1)
+      else navigate("/")
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
+    }
   }
 
   return (
-    <OverlayScreen title="Le revenu" color="teal" footer={<SaveBar color="teal" onSubmit={(e) => void save(e)} />}>
+    <OverlayScreen
+      title={existing ? "Modifier le revenu" : "Le revenu"}
+      color="teal"
+      footer={<SaveBar color="teal" disabled={!canSave} onSubmit={(e) => void save(e)} />}
+    >
       <FormRow icon={<Car className="h-5 w-5" />}>
         <UnderlineField label="Véhicule" value={vehicle ? `${vehicle.marque} (${vehicle.nom})` : ""} readOnly />
       </FormRow>
@@ -137,6 +222,7 @@ export function RevenueForm() {
       </FormRow>
       <FormRow icon={<Banknote className="h-5 w-5" />}>
         <UnderlineField label="Montant" inputMode="decimal" value={montant} onChange={(e) => setMontant(e.target.value)} />
+        {amount == null ? <p className="mt-1 text-[12px] text-muted">Montant requis.</p> : null}
       </FormRow>
       <FormRow icon={<StickyNote className="h-5 w-5" />}>
         <UnderlineField label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -146,7 +232,9 @@ export function RevenueForm() {
 }
 
 export function MaintenanceForm() {
-  const { vehicle } = useApp()
+  const { id } = useParams<{ id: string }>()
+  const { vehicle, maintenances } = useApp()
+  const existing = useEntry(maintenances, id)
   const navigate = useNavigate()
   const init = useNow()
   const [date, setDate] = useState(init.date)
@@ -157,28 +245,58 @@ export function MaintenanceForm() {
   const [cout, setCout] = useState("")
   const [pieces, setPieces] = useState("")
   const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!existing) return
+    setDate(toDateInputValue(existing.date))
+    setTime(toTimeInputValue(existing.date))
+    setKm(existing.kilometrage > 0 ? String(existing.kilometrage) : "")
+    setType(existing.typeIntervention)
+    setTypeEntretien(existing.typeEntretien)
+    setCout(existing.coutTotal ? String(existing.coutTotal).replace(".", ",") : "")
+    setPieces(existing.referencesPieces)
+    setNotes(existing.notes)
+  }, [existing])
+
+  const touchKm = useHydratedNumber(vehicle?.kmActuel, setKm, !existing)
+
+  const kmValue = parseDecimal(km) ?? 0
+  const canSave =
+    typeEntretien.trim().length > 0 && kmValue > 0 && !saving && (!id || Boolean(existing))
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!vehicle) return
-    const amount = parseDecimal(cout) ?? 0
-    await db.maintenances.add({
-      id: uid(),
-      vehicleId: vehicle.id,
-      date: toIso(date, time),
-      kilometrage: Number(km) || 0,
-      typeIntervention,
-      typeEntretien,
-      coutTotal: amount,
-      referencesPieces: pieces,
-      notes,
-      createdAt: new Date().toISOString(),
-    })
-    navigate("/")
+    if (!vehicle || !canSave) return
+    setSaving(true)
+    try {
+      await db.maintenances.put({
+        id: existing?.id ?? uid(),
+        vehicleId: existing?.vehicleId ?? vehicle.id,
+        date: toIso(date, time),
+        kilometrage: Math.round(kmValue),
+        typeIntervention,
+        typeEntretien: typeEntretien.trim(),
+        coutTotal: parseDecimal(cout) ?? 0,
+        referencesPieces: pieces,
+        notes,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      })
+      await raiseOdometer(existing?.vehicleId ?? vehicle.id, kmValue)
+      if (existing) navigate(-1)
+      else navigate("/")
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
+    }
   }
 
   return (
-    <OverlayScreen title="Entretien" footer={<SaveBar onSubmit={(e) => void save(e)} />}>
+    <OverlayScreen
+      title={existing ? "Modifier l'entretien" : "Entretien"}
+      footer={<SaveBar disabled={!canSave} onSubmit={(e) => void save(e)} />}
+    >
       <FormRow icon={<Car className="h-5 w-5" />}>
         <UnderlineField label="Véhicule" value={vehicle ? `${vehicle.marque} (${vehicle.nom})` : ""} readOnly />
       </FormRow>
@@ -189,7 +307,8 @@ export function MaintenanceForm() {
         </div>
       </FormRow>
       <FormRow icon={<Gauge className="h-5 w-5" />}>
-        <UnderlineField label="Compteur kilométrique" inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value)} />
+        <UnderlineField label="Compteur kilométrique" inputMode="numeric" value={km} onChange={(e) => { touchKm(); setKm(e.target.value) }} />
+        {kmValue <= 0 ? <p className="mt-1 text-[12px] text-muted">Kilométrage requis.</p> : null}
       </FormRow>
       <FormRow icon={<Wrench className="h-5 w-5" />}>
         <UnderlineField label="Type d'intervention" value={typeEntretien} onChange={(e) => setTypeEntretien(e.target.value)} />
@@ -215,33 +334,62 @@ export function MaintenanceForm() {
 }
 
 export function ReminderForm() {
-  const { vehicle } = useApp()
+  const { id } = useParams<{ id: string }>()
+  const { vehicle, reminders } = useApp()
+  const existing = useEntry(reminders, id)
   const navigate = useNavigate()
   const [titre, setTitre] = useState("Plein suivant")
   const [type, setType] = useState<ReminderType>("plein")
   const [km, setKm] = useState("")
   const [date, setDate] = useState("")
   const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!existing) return
+    setTitre(existing.titre)
+    setType(existing.type)
+    setKm(existing.kmEcheance != null ? String(existing.kmEcheance) : "")
+    setDate(existing.dateEcheance ? toDateInputValue(existing.dateEcheance) : "")
+    setNotes(existing.notes ?? "")
+  }, [existing])
+
+  const canSave =
+    titre.trim().length > 0 &&
+    (parseDecimal(km) != null || date.length > 0) &&
+    !saving &&
+    (!id || Boolean(existing))
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!vehicle) return
-    await db.reminders.add({
-      id: uid(),
-      vehicleId: vehicle.id,
-      titre,
-      type,
-      kmEcheance: km ? Number(km) : undefined,
-      dateEcheance: date ? new Date(`${date}T08:00`).toISOString() : undefined,
-      resolu: false,
-      notes,
-      createdAt: new Date().toISOString(),
-    })
-    navigate("/rappels")
+    if (!vehicle || !canSave) return
+    setSaving(true)
+    try {
+      await db.reminders.put({
+        id: existing?.id ?? uid(),
+        vehicleId: existing?.vehicleId ?? vehicle.id,
+        titre: titre.trim(),
+        type,
+        kmEcheance: parseDecimal(km) != null ? Math.round(parseDecimal(km)!) : undefined,
+        dateEcheance: date ? new Date(`${date}T08:00`).toISOString() : undefined,
+        resolu: existing?.resolu ?? false,
+        notes,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      })
+      navigate("/rappels")
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
+    }
   }
 
   return (
-    <OverlayScreen title="Rappel" color="teal" footer={<SaveBar color="teal" onSubmit={(e) => void save(e)} />}>
+    <OverlayScreen
+      title={existing ? "Modifier le rappel" : "Rappel"}
+      color="teal"
+      footer={<SaveBar color="teal" disabled={!canSave} onSubmit={(e) => void save(e)} />}
+    >
       <FormRow icon={<StickyNote className="h-5 w-5" />}>
         <UnderlineField label="Titre" value={titre} onChange={(e) => setTitre(e.target.value)} />
       </FormRow>
@@ -268,32 +416,58 @@ export function ReminderForm() {
 }
 
 export function ReadingForm() {
-  const { vehicle } = useApp()
+  const { id } = useParams<{ id: string }>()
+  const { vehicle, readings } = useApp()
+  const existing = useEntry(readings, id)
   const navigate = useNavigate()
   const init = useNow()
   const [date, setDate] = useState(init.date)
   const [time, setTime] = useState(init.time)
   const [km, setKm] = useState(String(vehicle?.kmActuel ?? ""))
   const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!existing) return
+    setDate(toDateInputValue(existing.date))
+    setTime(toTimeInputValue(existing.date))
+    setKm(String(existing.kilometrage))
+    setNotes(existing.notes)
+  }, [existing])
+
+  const touchKm = useHydratedNumber(vehicle?.kmActuel, setKm, !existing)
+
+  const kmValue = parseDecimal(km) ?? 0
+  const canSave = kmValue > 0 && !saving && (!id || Boolean(existing))
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!vehicle) return
-    const k = Number(km)
-    await db.readings.add({
-      id: uid(),
-      vehicleId: vehicle.id,
-      date: toIso(date, time),
-      kilometrage: k,
-      notes,
-      createdAt: new Date().toISOString(),
-    })
-    if (k > vehicle.kmActuel) await db.vehicles.update(vehicle.id, { kmActuel: k })
-    navigate("/")
+    if (!vehicle || !canSave) return
+    setSaving(true)
+    try {
+      await db.readings.put({
+        id: existing?.id ?? uid(),
+        vehicleId: existing?.vehicleId ?? vehicle.id,
+        date: toIso(date, time),
+        kilometrage: Math.round(kmValue),
+        notes,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      })
+      await raiseOdometer(existing?.vehicleId ?? vehicle.id, kmValue)
+      if (existing) navigate(-1)
+      else navigate("/")
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
+    }
   }
 
   return (
-    <OverlayScreen title="Relevé" footer={<SaveBar onSubmit={(e) => void save(e)} />}>
+    <OverlayScreen
+      title={existing ? "Modifier le relevé" : "Relevé"}
+      footer={<SaveBar disabled={!canSave} onSubmit={(e) => void save(e)} />}
+    >
       <FormRow icon={<CalendarClock className="h-5 w-5" />}>
         <div className="grid grid-cols-2 gap-4">
           <UnderlineField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -301,7 +475,8 @@ export function ReadingForm() {
         </div>
       </FormRow>
       <FormRow icon={<Gauge className="h-5 w-5" />}>
-        <UnderlineField label="Compteur kilométrique" inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value)} />
+        <UnderlineField label="Compteur kilométrique" inputMode="numeric" value={km} onChange={(e) => { touchKm(); setKm(e.target.value) }} />
+        {kmValue <= 0 ? <p className="mt-1 text-[12px] text-muted">Kilométrage requis.</p> : null}
       </FormRow>
       <FormRow icon={<StickyNote className="h-5 w-5" />}>
         <UnderlineField label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -311,7 +486,9 @@ export function ReadingForm() {
 }
 
 export function TripForm() {
-  const { vehicle } = useApp()
+  const { id } = useParams<{ id: string }>()
+  const { vehicle, trips } = useApp()
+  const existing = useEntry(trips, id)
   const navigate = useNavigate()
   const init = useNow()
   const [date, setDate] = useState(init.date)
@@ -320,27 +497,56 @@ export function TripForm() {
   const [fin, setFin] = useState("")
   const [dest, setDest] = useState("")
   const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!existing) return
+    setDate(toDateInputValue(existing.date))
+    setTime(toTimeInputValue(existing.date))
+    setDebut(String(existing.kmDebut))
+    setFin(String(existing.kmFin))
+    setDest(existing.destination)
+    setNotes(existing.notes)
+  }, [existing])
+
+  const touchDebut = useHydratedNumber(vehicle?.kmActuel, setDebut, !existing)
+
+  const debutValue = parseDecimal(debut) ?? 0
+  const finValue = parseDecimal(fin) ?? 0
+  const canSave =
+    finValue > 0 && finValue >= debutValue && !saving && (!id || Boolean(existing))
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!vehicle) return
-    const kmFin = Number(fin)
-    await db.trips.add({
-      id: uid(),
-      vehicleId: vehicle.id,
-      date: toIso(date, time),
-      kmDebut: Number(debut) || 0,
-      kmFin,
-      destination: dest,
-      notes,
-      createdAt: new Date().toISOString(),
-    })
-    if (kmFin > vehicle.kmActuel) await db.vehicles.update(vehicle.id, { kmActuel: kmFin })
-    navigate("/")
+    if (!vehicle || !canSave) return
+    setSaving(true)
+    try {
+      await db.trips.put({
+        id: existing?.id ?? uid(),
+        vehicleId: existing?.vehicleId ?? vehicle.id,
+        date: toIso(date, time),
+        kmDebut: Math.round(debutValue),
+        kmFin: Math.round(finValue),
+        destination: dest,
+        notes,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      })
+      await raiseOdometer(existing?.vehicleId ?? vehicle.id, finValue)
+      if (existing) navigate(-1)
+      else navigate("/")
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
+    }
   }
 
   return (
-    <OverlayScreen title="Itinéraire" color="teal" footer={<SaveBar color="teal" onSubmit={(e) => void save(e)} />}>
+    <OverlayScreen
+      title={existing ? "Modifier l'itinéraire" : "Itinéraire"}
+      color="teal"
+      footer={<SaveBar color="teal" disabled={!canSave} onSubmit={(e) => void save(e)} />}
+    >
       <FormRow icon={<CalendarClock className="h-5 w-5" />}>
         <div className="grid grid-cols-2 gap-4">
           <UnderlineField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -352,9 +558,14 @@ export function TripForm() {
       </FormRow>
       <FormRow icon={<Gauge className="h-5 w-5" />}>
         <div className="grid grid-cols-2 gap-4">
-          <UnderlineField label="Km début" inputMode="numeric" value={debut} onChange={(e) => setDebut(e.target.value)} />
+          <UnderlineField label="Km début" inputMode="numeric" value={debut} onChange={(e) => { touchDebut(); setDebut(e.target.value) }} />
           <UnderlineField label="Km fin" inputMode="numeric" value={fin} onChange={(e) => setFin(e.target.value)} />
         </div>
+        {finValue > 0 && finValue < debutValue ? (
+          <p className="mt-1 text-[12px] text-[#c62828]">
+            Le compteur d'arrivée doit être supérieur au départ.
+          </p>
+        ) : null}
       </FormRow>
       <FormRow icon={<StickyNote className="h-5 w-5" />}>
         <UnderlineField label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -364,41 +575,78 @@ export function TripForm() {
 }
 
 export function ChecklistForm() {
-  const { vehicle } = useApp()
+  const { id } = useParams<{ id: string }>()
+  const { vehicle, checklists } = useApp()
+  const existing = useEntry(checklists, id)
   const navigate = useNavigate()
   const [titre, setTitre] = useState("Contrôle avant départ")
   const [raw, setRaw] = useState("Pression des pneus\nNiveaux\nÉclairage")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!existing) return
+    setTitre(existing.titre)
+    setRaw(
+      (Array.isArray(existing.items) ? existing.items : [])
+        .map((item) => item.label)
+        .join("\n"),
+    )
+  }, [existing])
+
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const canSave = titre.trim().length > 0 && lines.length > 0 && !saving && (!id || Boolean(existing))
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!vehicle) return
-    await db.checklists.add({
-      id: uid(),
-      vehicleId: vehicle.id,
-      titre,
-      date: new Date().toISOString(),
-      items: raw
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .map((label) => ({ id: uid(), label, done: false })),
-      createdAt: new Date().toISOString(),
-    })
-    navigate("/")
+    if (!vehicle || !canSave) return
+    setSaving(true)
+    try {
+      await db.checklists.put({
+        id: existing?.id ?? uid(),
+        vehicleId: existing?.vehicleId ?? vehicle.id,
+        titre: titre.trim(),
+        date: existing?.date ?? new Date().toISOString(),
+        items: lines.map((label) => {
+          const previousItems = Array.isArray(existing?.items) ? existing.items : []
+          const previous = previousItems.find((item) => item.label === label)
+          return { id: previous?.id ?? uid(), label, done: previous?.done ?? false }
+        }),
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      })
+      if (existing) navigate(-1)
+      else navigate("/")
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
+    }
   }
 
   return (
-    <OverlayScreen title="Liste de contrôle" color="teal" footer={<SaveBar color="teal" onSubmit={(e) => void save(e)} />}>
+    <OverlayScreen
+      title={existing ? "Modifier la liste" : "Liste de contrôle"}
+      color="teal"
+      footer={<SaveBar color="teal" disabled={!canSave} onSubmit={(e) => void save(e)} />}
+    >
       <FormRow icon={<StickyNote className="h-5 w-5" />}>
         <UnderlineField label="Titre" value={titre} onChange={(e) => setTitre(e.target.value)} />
       </FormRow>
       <div className="px-4 py-3">
-        <label className="block text-[12px] text-muted">Éléments (un par ligne)</label>
+        <label className="block text-[12px] text-muted" htmlFor="checklist-items">
+          Éléments (un par ligne)
+        </label>
         <textarea
+          id="checklist-items"
           value={raw}
           onChange={(e) => setRaw(e.target.value)}
           className="mt-1 h-40 w-full rounded-lg border border-line p-3 text-sm outline-none focus:border-teal"
         />
+        {lines.length === 0 ? (
+          <p className="mt-1 text-[12px] text-muted">Ajoutez au moins un élément.</p>
+        ) : null}
       </div>
     </OverlayScreen>
   )

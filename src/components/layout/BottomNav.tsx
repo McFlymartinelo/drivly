@@ -211,6 +211,20 @@ export function BottomNav({
   const rx = RING * (1 + light.stretch)
   const ry = RING * (1 - light.stretch * 0.25)
 
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return
+    const buttons = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'),
+    )
+    if (buttons.length === 0) return
+    const current = buttons.findIndex((button) => button === document.activeElement)
+    const delta = event.key === "ArrowRight" ? 1 : -1
+    const next = (current + delta + buttons.length) % buttons.length
+    event.preventDefault()
+    buttons[next]?.focus()
+    activate(next)
+  }
+
   return (
     <nav className="relative z-40 bg-transparent px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-1">
       <div
@@ -220,6 +234,7 @@ export function BottomNav({
         onPointerMove={onBarPointerMove}
         onPointerUp={endPointer}
         onPointerCancel={endPointer}
+        onKeyDown={onKeyDown}
         role="tablist"
         aria-label="Navigation principale. Touchez un onglet ou faites glisser la lumière."
       >
@@ -281,6 +296,7 @@ export function BottomNav({
               role="tab"
               aria-selected={active}
               aria-label={tab.label}
+              tabIndex={active ? 0 : -1}
               className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1"
               onClick={() => {
                 if (ignoreClick.current) {

@@ -7,14 +7,21 @@ import {
   MapPin,
   User,
 } from "lucide-react"
-import { useEffect, useMemo, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { db } from "../../db/db"
 import { useApp } from "../../hooks/useApp"
 import { FUEL_TYPES, PAYMENT_MODES, type FuelType } from "../../types"
 import { lastOdometer } from "../../utils/calculations"
 import { uid } from "../../utils/cn"
-import { formatIsoDate, formatIsoTime, parseDecimal, round2 } from "../../utils/format"
+import {
+  parseDecimal,
+  round2,
+  toDateInputValue,
+  toTimeInputValue,
+} from "../../utils/format"
+import { raiseOdometer } from "../../utils/odometer"
+import { showError } from "../../utils/toast"
 import { FormRow, Toggle, UnderlineField, UnderlineSelect } from "../shared/Form"
 import { OverlayScreen, SaveBar } from "../shared/OverlayScreen"
 
@@ -25,15 +32,25 @@ export function RefuelingForm() {
   const navigate = useNavigate()
   const { vehicle, vehicles, refuelings } = useApp()
   const existing = refuelings.find((f) => f.id === id)
+  const isEdit = Boolean(id)
 
   const lastKm = lastOdometer(refuelings, vehicle?.kmActuel ?? 0)
+  const latest = useMemo(
+    () =>
+      [...refuelings].sort(
+        (a, b) => b.date.localeCompare(a.date) || b.kilometrage - a.kilometrage,
+      )[0],
+    [refuelings],
+  )
+  const prefilled = useRef(false)
+  const kmTouched = useRef(false)
 
-  const [vehicleId, setVehicleId] = useState(existing?.vehicleId ?? vehicle?.id ?? "")
-  const [date, setDate] = useState("")
-  const [time, setTime] = useState("")
-  const [km, setKm] = useState("")
+  const [vehicleId, setVehicleId] = useState(vehicle?.id ?? "")
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [time, setTime] = useState(new Date().toTimeString().slice(0, 5))
+  const [km, setKm] = useState(String(lastKm))
   const [carburant, setCarburant] = useState<FuelType>(
-    existing?.carburant ?? vehicle?.carburantDefaut ?? "Diesel",
+    vehicle?.carburantDefaut ?? "Diesel",
   )
   const [prix, setPrix] = useState("")
   const [total, setTotal] = useState("")
@@ -45,94 +62,130 @@ export function RefuelingForm() {
   const [notes, setNotes] = useState("")
   const [more, setMore] = useState(false)
   const [lastEdited, setLastEdited] = useState<LastEdited>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Hydratation en édition (y compris après un rechargement direct de l'URL).
+  useEffect(() => {
+    if (!existing) return
+    setVehicleId(existing.vehicleId)
+    setDate(toDateInputValue(existing.date))
+    setTime(toTimeInputValue(existing.date))
+    setKm(String(existing.kilometrage))
+    setCarburant(existing.carburant)
+    setPrix(String(existing.prixAuLitre).replace(".", ","))
+    setTotal(String(existing.coutTotal).replace(".", ","))
+    setLitres(String(existing.litres).replace(".", ","))
+    setFull(existing.pleinComplet)
+    setStation(existing.station)
+    setDriver(existing.conducteur)
+    setPayment(existing.modePaiement)
+    setNotes(existing.notes)
+    setMore(Boolean(existing.notes || existing.modePaiement))
+  }, [existing])
+
+  // Pré-remplissage d'un nouveau plein avec le dernier passage : station,
+  // prix et mode de paiement sont le plus souvent identiques.
+  useEffect(() => {
+    if (isEdit || prefilled.current || !latest) return
+    prefilled.current = true
+    if (latest.station) setStation(latest.station)
+    if (latest.modePaiement) setPayment(latest.modePaiement)
+    if (latest.carburant) setCarburant(latest.carburant)
+    if (latest.prixAuLitre > 0) setPrix(String(latest.prixAuLitre).replace(".", ","))
+    if (latest.conducteur) setDriver(latest.conducteur)
+  }, [isEdit, latest])
+
+  // Les données IndexedDB arrivent après le premier rendu : on complète le
+  // véhicule et le compteur sans écraser une saisie en cours.
+  useEffect(() => {
+    if (!vehicleId && vehicle) setVehicleId(vehicle.id)
+  }, [vehicleId, vehicle])
 
   useEffect(() => {
-    if (existing) {
-      setVehicleId(existing.vehicleId)
-      setDate(formatIsoDate(existing.date).split("/").reverse().join("-"))
-      setTime(formatIsoTime(existing.date))
-      setKm(String(existing.kilometrage))
-      setCarburant(existing.carburant)
-      setPrix(String(existing.prixAuLitre).replace(".", ","))
-      setTotal(String(existing.coutTotal).replace(".", ","))
-      setLitres(String(existing.litres).replace(".", ","))
-      setFull(existing.pleinComplet)
-      setStation(existing.station)
-      setDriver(existing.conducteur)
-      setPayment(existing.modePaiement)
-      setNotes(existing.notes)
-      setMore(Boolean(existing.notes || existing.modePaiement))
-      return
-    }
-    const now = new Date()
-    setDate(now.toISOString().slice(0, 10))
-    setTime(now.toTimeString().slice(0, 5))
-    if (vehicle) {
-      setVehicleId(vehicle.id)
-      setCarburant(vehicle.carburantDefaut)
-    }
-  }, [existing, vehicle])
+    if (isEdit || kmTouched.current) return
+    if (lastKm > 0) setKm(String(lastKm))
+  }, [isEdit, lastKm])
 
   useEffect(() => {
     const p = parseDecimal(prix)
     const t = parseDecimal(total)
     const l = parseDecimal(litres)
-    if (lastEdited === "price" && p != null && l != null) {
-      setTotal(String(round2(p * l)).replace(".", ","))
-    } else if (lastEdited === "litres" && p != null && l != null) {
-      setTotal(String(round2(p * l)).replace(".", ","))
-    } else if (lastEdited === "total" && p != null && t != null && p > 0) {
-      setLitres(String(round2(t / p)).replace(".", ","))
-    } else if (lastEdited === "total" && l != null && t != null && l > 0) {
-      setPrix(String(round2(t / l)).replace(".", ","))
+
+    if (lastEdited === "total") {
+      // Le champ modifié est le total : on complète d'abord les litres si le
+      // prix est connu, sinon le prix à partir des litres.
+      if (p != null && p > 0 && t != null) {
+        setLitres(String(round2(t / p)).replace(".", ","))
+      } else if (l != null && l > 0 && t != null) {
+        setPrix(String(round2(t / l)).replace(".", ","))
+      }
+      return
+    }
+
+    if (lastEdited === "price" || lastEdited === "litres") {
+      if (p != null && l != null) {
+        setTotal(String(round2(p * l)).replace(".", ","))
+      }
     }
   }, [prix, total, litres, lastEdited])
 
   const selectedVehicle = vehicles.find((v) => v.id === vehicleId) ?? vehicle
 
-  const hint = useMemo(() => {
-    if (!selectedVehicle) return undefined
-    return `Dernier compteur ${lastKm} km`
-  }, [selectedVehicle, lastKm])
+  const kmValue = parseDecimal(km) ?? 0
+  const p = parseDecimal(prix)
+  const t = parseDecimal(total)
+  const l = parseDecimal(litres)
+  const canSave =
+    Boolean(vehicleId) &&
+    Boolean(date) &&
+    kmValue > 0 &&
+    p != null &&
+    p > 0 &&
+    t != null &&
+    t > 0 &&
+    l != null &&
+    l > 0 &&
+    !saving &&
+    (!isEdit || Boolean(existing))
+
+  const hint = selectedVehicle ? `Dernier compteur ${lastKm} km` : undefined
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    const p = parseDecimal(prix)
-    const t = parseDecimal(total)
-    const l = parseDecimal(litres)
-    const k = Number(km)
-    if (!vehicleId || !date || !Number.isFinite(k) || p == null || t == null || l == null) {
-      return
+    if (!canSave || p == null || t == null || l == null) return
+    setSaving(true)
+    try {
+      const iso = new Date(`${date}T${time || "12:00"}`).toISOString()
+      const recordId = existing?.id ?? uid()
+      await db.refuelings.put({
+        id: recordId,
+        vehicleId,
+        date: iso,
+        kilometrage: Math.round(kmValue),
+        litres: l,
+        prixAuLitre: p,
+        coutTotal: t,
+        carburant,
+        pleinComplet: full,
+        station: station.trim(),
+        notes,
+        conducteur: driver,
+        modePaiement: payment,
+        createdAt: existing?.createdAt ?? iso,
+      })
+      await raiseOdometer(vehicleId, kmValue)
+      navigate(`/plein/${recordId}`, { replace: true })
+    } catch (error) {
+      console.error(error)
+      showError()
+      setSaving(false)
     }
-    const iso = new Date(`${date}T${time || "12:00"}`).toISOString()
-    const recordId = existing?.id ?? uid()
-    await db.refuelings.put({
-      id: recordId,
-      vehicleId,
-      date: iso,
-      kilometrage: k,
-      litres: l,
-      prixAuLitre: p,
-      coutTotal: t,
-      carburant,
-      pleinComplet: full,
-      station,
-      notes,
-      conducteur: driver,
-      modePaiement: payment,
-      createdAt: existing?.createdAt ?? iso,
-    })
-    const v = await db.vehicles.get(vehicleId)
-    if (v && k > v.kmActuel) {
-      await db.vehicles.update(vehicleId, { kmActuel: k })
-    }
-    navigate(`/plein/${recordId}`, { replace: true })
   }
 
   return (
     <OverlayScreen
-      title="Plein"
-      footer={<SaveBar onSubmit={(e) => void save(e)} />}
+      title={isEdit ? "Modifier le plein" : "Plein"}
+      footer={<SaveBar disabled={!canSave} onSubmit={(e) => void save(e)} />}
     >
       <FormRow icon={<Car className="h-5 w-5" />}>
         <UnderlineSelect
@@ -171,8 +224,14 @@ export function RefuelingForm() {
           inputMode="numeric"
           value={km}
           hint={hint}
-          onChange={(e) => setKm(e.target.value)}
+          onChange={(e) => {
+            kmTouched.current = true
+            setKm(e.target.value)
+          }}
         />
+        {kmValue <= 0 ? (
+          <p className="mt-1 text-[12px] text-muted">Compteur requis.</p>
+        ) : null}
       </FormRow>
 
       <FormRow icon={<Fuel className="h-5 w-5" />}>
@@ -219,6 +278,11 @@ export function RefuelingForm() {
             }}
           />
         </div>
+        {!canSave && !saving ? (
+          <p className="mt-1 text-[11px] text-muted">
+            Prix, litres et total sont nécessaires (deux suffisent à calculer le troisième).
+          </p>
+        ) : null}
       </FormRow>
 
       <FormRow icon={<Fuel className="h-5 w-5" />}>

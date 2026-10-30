@@ -9,6 +9,33 @@ npm run dev
 
 Ouvre [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
+## Fonctionnalités
+
+- **Pleins** : consommation réelle (les pleins partiels sont reportés au plein complet suivant), coût au km, prix par station.
+- **Entretiens, dépenses, revenus, relevés, itinéraires, listes de contrôle** : chaque entrée est consultable, modifiable et supprimable (avec annulation).
+- **Rappels** : statut « à venir / bientôt / dépassé », suggestions automatiques déduites des intervalles d'entretien.
+- **Rapports** : période (tout, 12 mois, année, personnalisée), export CSV pour la comptabilité.
+- **Véhicules** : création avec marque, immatriculation, carburant, capacité du réservoir et kilométrage de départ.
+- **Onboarding** : au premier lancement, créer son véhicule, importer une sauvegarde ou explorer la démonstration.
+
+## Qualité
+
+```bash
+npm run typecheck   # TypeScript strict
+npm run lint
+npm test            # tests unitaires des calculs (vitest)
+npm run build
+```
+
+Les calculs (consommation, agrégats, rappels, import) sont couverts par des tests : `src/utils/*.test.ts`.
+
+## Données locales
+
+- Les données restent dans le navigateur. L'app demande la **persistance du stockage** ; sur iOS, installez la PWA pour éviter l'éviction après quelques jours d'inactivité.
+- **Export / import JSON** depuis l'écran **Plus** (ou le bouton d'en-tête, qui utilise le partage natif quand il existe).
+- L'import est **validé et confirmé** : aperçu du contenu, refus des fichiers invalides, export de sécurité automatique avant remplacement.
+- Un écran d'erreur global permet d'exporter ou de réinitialiser les données si une entrée corrompue bloque l'affichage.
+
 ## Déploiement Debian (accès distant)
 
 L’app est un site statique : nginx sert les fichiers, **la base reste dans le navigateur** de chaque appareil (IndexedDB). Ce n’est pas une base sur le serveur.
