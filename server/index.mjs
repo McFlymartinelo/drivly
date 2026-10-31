@@ -1,8 +1,7 @@
 import http from "node:http"
-import { createHash, timingSafeEqual } from "node:crypto"
-import { mkdirSync } from "node:fs"
-import { dirname } from "node:path"
-import { DatabaseSync } from "node:sqlite"
+import { timingSafeEqual } from "node:crypto"
+import { createStore, isEntryTable } from "./store.mjs"
+import { normalizePayload } from "./validate.mjs"
 
 const PORT = Number(process.env.PORT ?? 3000)
 const DB_PATH = process.env.DRIVLY_DB ?? "/data/drivly.sqlite"
@@ -14,18 +13,6 @@ const CORS_ORIGINS = (process.env.DRIVLY_CORS_ORIGIN ?? "")
   .map((value) => value.trim())
   .filter(Boolean)
 
-const ENTRIES = [
-  "vehicles",
-  "refuelings",
-  "reminders",
-  "maintenances",
-  "expenses",
-  "revenues",
-  "readings",
-  "trips",
-  "checklists",
-]
-
 if (TOKEN.length < 16) {
   console.error(
     "DRIVLY_TOKEN manquant ou trop court (16 caractères minimum).\n" +
@@ -34,61 +21,16 @@ if (TOKEN.length < 16) {
   process.exit(1)
 }
 
-mkdirSync(dirname(DB_PATH), { recursive: true })
-const db = new DatabaseSync(DB_PATH)
-db.exec("PRAGMA journal_mode = WAL")
-db.exec("PRAGMA synchronous = NORMAL")
-db.exec(`
-  CREATE TABLE IF NOT EXISTS backups (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL,
-    device TEXT NOT NULL DEFAULT '',
-    counts TEXT NOT NULL,
-    hash TEXT NOT NULL,
-    payload TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS backups_created_at ON backups (created_at DESC);
-`)
-
-const listStmt = db.prepare(
-  `SELECT id, created_at, device, counts, hash, length(payload) AS bytes
-   FROM backups ORDER BY id DESC LIMIT ?`,
-)
-const getStmt = db.prepare(
-  `SELECT id, created_at, device, counts, hash, payload, length(payload) AS bytes
-   FROM backups WHERE id = ?`,
-)
-const latestStmt = db.prepare(
-  `SELECT id, created_at, device, counts, hash, payload, length(payload) AS bytes
-   FROM backups ORDER BY id DESC LIMIT 1`,
-)
-const insertStmt = db.prepare(
-  `INSERT INTO backups (created_at, device, counts, hash, payload)
-   VALUES (?, ?, ?, ?, ?)`,
-)
-const pruneStmt = db.prepare(
-  `DELETE FROM backups WHERE id NOT IN
-   (SELECT id FROM backups ORDER BY id DESC LIMIT ?)`,
-)
-
-function meta(row) {
-  return {
-    id: row.id,
-    createdAt: row.created_at,
-    device: row.device,
-    counts: JSON.parse(row.counts),
-    bytes: row.bytes,
-  }
-}
+const store = createStore(DB_PATH, { maxSnapshots: MAX_SNAPSHOTS })
+store.rebuildFromLatest()
 
 function json(res, status, body) {
-  const text = JSON.stringify(body)
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
   })
-  res.end(text)
+  res.end(JSON.stringify(body))
 }
 
 function applyCors(req, res) {
@@ -134,27 +76,6 @@ function readJson(req) {
   })
 }
 
-function normalizePayload(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    throw Object.assign(new Error("Sauvegarde invalide : objet attendu."), { status: 400 })
-  }
-  if (raw.version !== 1 && raw.version !== 2) {
-    throw Object.assign(new Error("Version de sauvegarde non prise en charge."), { status: 400 })
-  }
-  const payload = { ...raw }
-  for (const table of ENTRIES) {
-    if (payload[table] == null) payload[table] = []
-    if (!Array.isArray(payload[table])) {
-      throw Object.assign(new Error(`« ${table} » doit être une liste.`), { status: 400 })
-    }
-  }
-  return payload
-}
-
-function countsOf(payload) {
-  return Object.fromEntries(ENTRIES.map((table) => [table, payload[table].length]))
-}
-
 async function handle(req, res) {
   applyCors(req, res)
 
@@ -180,52 +101,61 @@ async function handle(req, res) {
   if (path === "/api/backups" && req.method === "POST") {
     const body = await readJson(req)
     const payload = normalizePayload(body?.payload)
-    const device = typeof body?.device === "string" ? body.device.slice(0, 120) : ""
-    const text = JSON.stringify(payload)
-    // L'empreinte ignore `exportedAt` : deux envois des mêmes données sont
-    // considérés identiques et ne créent pas de sauvegarde en double.
-    const hash = createHash("sha256")
-      .update(JSON.stringify(ENTRIES.map((table) => payload[table])))
-      .digest("hex")
-
-    const latest = latestStmt.get()
-    if (latest && latest.hash === hash) {
-      json(res, 200, { skipped: true, backup: meta(latest) })
-      return
-    }
-
-    const createdAt = new Date().toISOString()
-    const result = insertStmt.run(createdAt, device, JSON.stringify(countsOf(payload)), hash, text)
-    pruneStmt.run(MAX_SNAPSHOTS)
-    const stored = getStmt.get(Number(result.lastInsertRowid))
-    json(res, 201, { skipped: false, backup: meta(stored) })
+    const device = typeof body?.device === "string" ? body.device : ""
+    const result = store.save(payload, device)
+    json(res, result.skipped ? 200 : 201, result)
     return
   }
 
   if (path === "/api/backups" && req.method === "GET") {
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 20)))
-    json(res, 200, { backups: listStmt.all(limit).map(meta) })
+    json(res, 200, { backups: store.list(limit) })
     return
   }
 
   if (path === "/api/backups/latest" && req.method === "GET") {
-    const row = latestStmt.get()
+    const row = store.latest()
     if (!row) {
       json(res, 404, { error: "Aucune sauvegarde sur le serveur." })
       return
     }
-    json(res, 200, { backup: meta(row), payload: JSON.parse(row.payload) })
+    json(res, 200, { backup: store.list(1)[0], payload: JSON.parse(row.payload) })
     return
   }
 
-  const match = /^\/api\/backups\/(\d+)$/.exec(path)
-  if (match && req.method === "GET") {
-    const row = getStmt.get(Number(match[1]))
+  const backupMatch = /^\/api\/backups\/(\d+)$/.exec(path)
+  if (backupMatch && req.method === "GET") {
+    const row = store.byId(Number(backupMatch[1]))
     if (!row) {
       json(res, 404, { error: "Sauvegarde introuvable." })
       return
     }
-    json(res, 200, { backup: meta(row), payload: JSON.parse(row.payload) })
+    json(res, 200, {
+      backup: store.list(100).find((backup) => backup.id === row.id),
+      payload: JSON.parse(row.payload),
+    })
+    return
+  }
+
+  const entryMatch = /^\/api\/entries\/([a-z]+)$/.exec(path)
+  if (entryMatch && req.method === "GET") {
+    const table = entryMatch[1]
+    if (!isEntryTable(table)) {
+      json(res, 404, { error: "Table inconnue." })
+      return
+    }
+    const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") ?? 100)))
+    const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0))
+    json(res, 200, { table, entries: store.entries(table, limit, offset) })
+    return
+  }
+
+  if (path === "/api/stats" && req.method === "GET") {
+    json(res, 200, {
+      counts: store.tableCounts(),
+      backups: store.backupCount(),
+      latest: store.latest()?.created_at ?? null,
+    })
     return
   }
 
@@ -244,7 +174,7 @@ const server = http.createServer((req, res) => {
 function shutdown() {
   server.close(() => {
     try {
-      db.close()
+      store.close()
     } catch {}
     process.exit(0)
   })

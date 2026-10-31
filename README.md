@@ -54,11 +54,28 @@ sudo docker compose up -d --build
 echo "$TOKEN"
 ```
 
-Puis dans l'app : **Plus → Sauvegarde serveur → Configurer**, laisse l'adresse `/api` et colle le jeton. La sauvegarde automatique s'active (après chaque modification et quand l'app passe en arrière-plan).
+Puis dans l'app : **Plus → Sauvegarde serveur → Configurer**, laisse l'adresse `/api` et colle le jeton. La sauvegarde automatique s'active : **chaque entrée ajoutée, modifiée ou supprimée est écrite dans les tables SQL du serveur en moins d'une seconde** (et quand l'app passe en arrière-plan).
+
+Côté serveur, chaque type d'entrée a sa table (`vehicles`, `refuelings`, `expenses`, `maintenances`, `reminders`, `readings`, `trips`, `checklists`) avec les colonnes utiles (`vehicle_id`, `date`, `kilometrage`, `montant`…) **et** le JSON complet dans `data`. Une version de sauvegarde est créée à chaque changement (dédupliquée par empreinte SHA-256).
 
 - **Restaurer** : Plus → Sauvegarde serveur → Restaurer, choisis une version. Un export local est téléchargé avant remplacement.
-- **Versionnage** : `DRIVLY_MAX_SNAPSHOTS` (50 par défaut) ; les envois identiques sont ignorés (empreinte SHA-256).
-- **API** : `GET /api/health`, `GET /api/backups`, `GET /api/backups/latest`, `GET /api/backups/:id`, `POST /api/backups` — protégés par `Authorization: Bearer <DRIVLY_TOKEN>`.
+- **Versionnage** : `DRIVLY_MAX_SNAPSHOTS` (50 par défaut).
+- **API** (protégée par `Authorization: Bearer <DRIVLY_TOKEN>`) :
+  - `GET /api/health`
+  - `POST /api/backups` (payload complet, met à jour les tables)
+  - `GET /api/backups`, `GET /api/backups/latest`, `GET /api/backups/:id`
+  - `GET /api/entries/refuelings?limit=100&offset=0` (idem pour chaque table)
+  - `GET /api/stats` (compteurs par table + nombre de versions)
+
+### Peupler la base depuis un fichier
+
+```bash
+docker compose cp ~/drivly-export-2026-10-30.json api:/tmp/export.json
+docker compose exec -T api node server/import.mjs /tmp/export.json
+```
+
+L'import remplace le contenu des tables et crée une version marquée « import CLI ». Il peut tourner pendant que l'API est active.
+
 
 ### Sauvegarder la base SQLite elle-même
 

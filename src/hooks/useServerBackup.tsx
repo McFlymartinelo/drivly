@@ -168,20 +168,41 @@ export function AutoBackup() {
     if (!ready) return
     const config = loadServerConfig()
     if (!config || !config.auto) return
+    // Envoi quasi immédiat après chaque insertion/modification.
     const timer = window.setTimeout(() => {
       void pushBackupNow()
-    }, 8000)
+    }, 500)
     return () => window.clearTimeout(timer)
   }, [signature, ready, configEpoch])
 
   useEffect(() => {
     function onVisibility() {
-      if (document.visibilityState === "hidden" && loadServerConfig()?.auto) {
+      if (!loadServerConfig()?.auto) return
+      if (document.visibilityState === "hidden") {
+        void pushBackupNow()
+      } else if (status.state === "error") {
+        // Retour au premier plan après une coupure réseau : on réessaie.
         void pushBackupNow()
       }
     }
+    function onOnline() {
+      if (loadServerConfig()?.auto) void pushBackupNow()
+    }
     document.addEventListener("visibilitychange", onVisibility)
-    return () => document.removeEventListener("visibilitychange", onVisibility)
+    window.addEventListener("online", onOnline)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("online", onOnline)
+    }
+  }, [])
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (status.state === "error" && loadServerConfig()?.auto) {
+        void pushBackupNow()
+      }
+    }, 30_000)
+    return () => window.clearInterval(id)
   }, [])
 
   return null

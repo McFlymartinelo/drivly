@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
+import { createStore, ENTRIES } from "./store.mjs"
 
 const TOKEN = "integration-token-0123456789"
 const PORT = String(4100 + Math.floor(Math.random() * 400))
@@ -140,6 +141,17 @@ test("API de sauvegarde", async () => {
     const byId = await call(`/backups/${second.body.backup.id}`)
     assert.equal(byId.body.payload.vehicles[0].nom, "v2")
 
+    const entries = await call("/entries/refuelings?limit=10")
+    assert.equal(entries.status, 200)
+    assert.equal(entries.body.entries.length, 1)
+    assert.equal(entries.body.entries[0].data.litres, 40)
+    assert.equal(entries.body.entries[0].data.station, "")
+
+    const stats = await call("/stats")
+    assert.equal(stats.body.counts.refuelings, 1)
+    assert.equal(stats.body.counts.vehicles, 1)
+    assert.equal(stats.body.backups, 2)
+
     const invalid = await call("/backups", {
       method: "POST",
       body: JSON.stringify({ payload: { version: 99 } }),
@@ -158,6 +170,31 @@ test("API de sauvegarde", async () => {
   } finally {
     child.kill("SIGTERM")
     await new Promise((resolve) => child.once("exit", resolve))
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test("store : tables, déduplication et reconstruction", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "drivly-store-"))
+  const store = createStore(join(dir, "store.sqlite"), { maxSnapshots: 5 })
+  try {
+    const first = store.save(payload("v1"), "cli")
+    assert.equal(first.skipped, false)
+    assert.equal(store.entries("refuelings").length, 1)
+    assert.equal(store.entries("refuelings")[0].data.coutTotal, 72)
+
+    const duplicate = store.save(payload("v1"), "cli")
+    assert.equal(duplicate.skipped, true)
+    assert.equal(store.backupCount(), 1)
+
+    // Simule une base migrée : tables vidées, sauvegarde conservée.
+    for (const table of ENTRIES) store.db.exec(`DELETE FROM ${table}`)
+    assert.equal(store.entries("refuelings").length, 0)
+    assert.equal(store.rebuildFromLatest(), true)
+    assert.equal(store.entries("refuelings").length, 1)
+    assert.equal(store.entries("vehicles").length, 1)
+  } finally {
+    store.close()
     await rm(dir, { recursive: true, force: true })
   }
 })
