@@ -135,6 +135,19 @@ Puis **Plus → Sauvegarde serveur → Restaurer** sur le téléphone.
 
 ⚠️ Les kilométrages sont des estimations : la consommation de la période sera lissée. Les dates, litres, prix et montants, eux, sont exacts.
 
+### Nettoyer les consommations aberrantes
+
+L'app ignore désormais les consommations hors **2–20 L/100km** (affichées « — » et exclues des moyennes, min/max et graphiques). Pour corriger aussi les données, le script repère les pleins partiels enregistrés comme complets et les repasse en partiels :
+
+```bash
+node scripts/sanitize-fills.mjs \
+  --file drivly-merged.json \
+  --out drivly-merged-clean.json
+```
+
+Il liste les pleins modifiés et les anomalies restantes (relevés manquants), puis produit une sauvegarde prête à réimporter.
+
+
 
 
 ## Déploiement Debian (accès distant)

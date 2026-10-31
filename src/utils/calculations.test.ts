@@ -4,6 +4,7 @@ import {
   aggregateFuel,
   computeReminderStats,
   fuelMetrics,
+  isPlausibleConsumption,
   reminderStatus,
   summarizeFuel,
 } from "./calculations"
@@ -159,6 +160,52 @@ describe("reminders", () => {
     expect(status.level).toBe("soon")
     expect(status.kmText).toBe("Dans 500 km")
     expect(computeReminderStats(reminder({ kmEcheance: 90_500 }), 90_000).kmRestants).toBe(500)
+  })
+})
+
+describe("plausibilité des consommations", () => {
+  it("ignore un plein partiel enregistré comme complet", () => {
+    const fills = [
+      fill("a", "2025-01-01T10:00:00.000Z", 1000, 40),
+      // 36 L pour 56 km : aberrant, typique d'un plein partiel mal saisi.
+      fill("b", "2025-01-05T10:00:00.000Z", 1056, 36),
+      fill("c", "2025-02-01T10:00:00.000Z", 1500, 40),
+    ]
+    const metrics = fuelMetrics(fills)
+    expect(metrics.get("b")?.consumption).toBeNull()
+    expect(metrics.get("b")?.costPerKm).toBeNull()
+    expect(metrics.get("c")?.consumption).toBeCloseTo((40 / 444) * 100, 5)
+
+    const agg = aggregateFuel(fills, fills)
+    expect(agg.minConsumption).toBeGreaterThanOrEqual(2)
+    expect(agg.avgConsumption).toBeCloseTo((40 / 444) * 100, 4)
+  })
+
+  it("ignore une consommation trop basse (relevé manquant)", () => {
+    const fills = [
+      fill("a", "2025-01-01T10:00:00.000Z", 1000, 40),
+      fill("b", "2025-06-01T10:00:00.000Z", 5000, 10),
+    ]
+    expect(fuelMetrics(fills).get("b")?.consumption).toBeNull()
+  })
+
+  it("borne les valeurs de référence", () => {
+    expect(isPlausibleConsumption(1.14)).toBe(false)
+    expect(isPlausibleConsumption(64.61)).toBe(false)
+    expect(isPlausibleConsumption(5.4)).toBe(true)
+    expect(isPlausibleConsumption(null)).toBe(false)
+  })
+
+  it("exclut les segments aberrants du résumé mensuel", () => {
+    const fills = [
+      fill("a", "2025-01-01T10:00:00.000Z", 1000, 40),
+      fill("b", "2025-01-05T10:00:00.000Z", 1056, 36),
+      fill("c", "2025-01-20T10:00:00.000Z", 1500, 40),
+    ]
+    const january = fills.filter((item) => item.date.startsWith("2025-01"))
+    const summary = summarizeFuel(january, fills)
+    expect(summary.distance).toBe(500)
+    expect(summary.consumption).toBeCloseTo((40 / 444) * 100, 5)
   })
 })
 

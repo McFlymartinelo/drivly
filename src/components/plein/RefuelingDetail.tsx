@@ -171,6 +171,13 @@ export function RefuelingDetail() {
               <FuelCan percent={stats.pourcentageReservoir ?? 0} className="mx-auto h-[88px] w-[72px]" />
             </div>
           </div>
+          {fill.pleinComplet &&
+          stats.distance != null &&
+          stats.consommation == null ? (
+            <p className="mt-3 border-t border-line pt-2 text-[11px] leading-snug text-muted">
+              Consommation incohérente ignorée : plein partiel ou relevé manquant.
+            </p>
+          ) : null}
         </Card>
 
         <div>

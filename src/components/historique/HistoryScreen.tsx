@@ -604,6 +604,13 @@ function FuelDetails({
       />
       <DetailRow label="Réservoir rempli" value={fill.pleinComplet ? "Oui" : "Non"} />
       <DetailRow label="Station service" value={fill.station || "—"} />
+      {fill.pleinComplet &&
+      stats.distance != null &&
+      stats.consommation == null ? (
+        <p className="mt-1 text-[11px] leading-snug text-muted">
+          Consommation incohérente ignorée (plein partiel ou relevé manquant).
+        </p>
+      ) : null}
       <div className="mt-2 flex justify-end gap-4 pr-1 text-muted">
         <button type="button" aria-label="Supprimer" onClick={onDelete}>
           <Trash2 className="h-5 w-5" />

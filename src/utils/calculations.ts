@@ -12,6 +12,23 @@ import type {
 
 const kmNumber = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 })
 
+/**
+ * Bornes de plausibilité d'une consommation (L/100km). En dehors, la valeur
+ * vient presque toujours d'un plein partiel mal saisi ou d'un relevé manquant :
+ * on l'ignore au lieu de polluer les moyennes, les graphiques et les min/max.
+ */
+export const MIN_PLAUSIBLE_CONSUMPTION = 2
+export const MAX_PLAUSIBLE_CONSUMPTION = 20
+
+export function isPlausibleConsumption(value: number | null | undefined): boolean {
+  return (
+    value != null &&
+    Number.isFinite(value) &&
+    value >= MIN_PLAUSIBLE_CONSUMPTION &&
+    value <= MAX_PLAUSIBLE_CONSUMPTION
+  )
+}
+
 function dayDiff(fromIso: string, toIso: string): number | null {
   const from = parseISO(fromIso)
   const to = parseISO(toIso)
@@ -104,11 +121,20 @@ export function fuelMetrics(fills: Refueling[]): Map<string, FillMetrics> {
     if (fill.pleinComplet && lastFull) {
       const segment = fill.kilometrage - lastFull.kilometrage
       if (segment > 0 && accLitres > 0) {
-        metrics.distance = segment
-        metrics.consumption = (accLitres / segment) * 100
-        metrics.costPerKm = accCost / segment
-        metrics.segmentLitres = accLitres
-        metrics.segmentCost = accCost
+        const consumption = (accLitres / segment) * 100
+        if (isPlausibleConsumption(consumption)) {
+          metrics.distance = segment
+          metrics.consumption = consumption
+          metrics.costPerKm = accCost / segment
+          metrics.segmentLitres = accLitres
+          metrics.segmentCost = accCost
+        } else {
+          // Segment incohérent : on garde la distance factuelle mais on
+          // n'expose ni consommation ni coût au km.
+          metrics.distance = segment
+          metrics.consumption = null
+          metrics.costPerKm = null
+        }
       }
     }
 
@@ -334,14 +360,31 @@ export function summarizeFuel(fills: Refueling[], allFills: Refueling[]) {
   const metrics = fuelMetrics(allFills)
   let distance = 0
   let litres = 0
+  let validLitres = 0
+  let validDistance = 0
+
   for (const fill of fills) {
     litres += fill.litres
-    distance += metrics.get(fill.id)?.kmSincePrev ?? 0
+    const fillMetrics = metrics.get(fill.id)
+    distance += fillMetrics?.kmSincePrev ?? 0
+    if (
+      fillMetrics?.consumption != null &&
+      fillMetrics.segmentLitres != null &&
+      fillMetrics.distance != null
+    ) {
+      validLitres += fillMetrics.segmentLitres
+      validDistance += fillMetrics.distance
+    }
   }
+
   return {
     distance: distance > 0 ? distance : null,
     litres,
-    consumption: distance > 0 ? (litres / distance) * 100 : null,
+    // La consommation ne s'appuie que sur les segments plausibles ; les
+    // valeurs aberrantes (plein partiel mal saisi, relevé manquant) sont
+    // exclues plutôt que de fausser le mois.
+    consumption:
+      validDistance > 0 ? (validLitres / validDistance) * 100 : null,
   }
 }
 
