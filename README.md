@@ -107,6 +107,35 @@ sudo systemctl enable --now drivly-api
 sudo cat /etc/drivly-api.env
 ```
 
+## Reconstituer des pleins depuis une carte carburant
+
+Un relevé de carte (TotalEnergies, etc.) donne les dates, litres, prix, montants et stations, mais pas le kilométrage. Le script ancre le dernier compteur connu puis répartit la distance au prorata des litres :
+
+```bash
+node scripts/rebuild-from-card.mjs \
+  --card ~/Downloads/releve-total.csv \
+  --km-now 195000 \
+  --plate CJ-653-HM
+```
+
+- `--km-now` : compteur actuel du véhicule. La distance totale devient exacte ; les kilomètres intermédiaires restent estimés. Sans cette option, la distance est estimée avec la consommation historique (affichée dans le résumé).
+- `--plate` : filtre les lignes d'un autre véhicule si le relevé contient une colonne véhicule.
+- Les colonnes sont détectées automatiquement (date, litres/volume, montant, prix/L, station, produit, compteur). Un compteur présent dans le relevé est utilisé tel quel.
+- Les lignes non-carburant (lavage, accessoires) deviennent des dépenses.
+- Les pleins reconstruits sont marqués dans leurs notes.
+
+Le script produit un JSON complet (historique existant + nouveaux pleins) à importer dans l'app, ou à charger directement sur le serveur :
+
+```bash
+docker compose cp drivly-reconstruit.json api:/tmp/reconstruit.json
+docker compose exec -T api node server/import.mjs /tmp/reconstruit.json
+```
+
+Puis **Plus → Sauvegarde serveur → Restaurer** sur le téléphone.
+
+⚠️ Les kilométrages sont des estimations : la consommation de la période sera lissée. Les dates, litres, prix et montants, eux, sont exacts.
+
+
 
 ## Déploiement Debian (accès distant)
 
