@@ -27,7 +27,7 @@ if (!file) {
 }
 const output = option("out", file.replace(/\.json$/i, "") + "-clean.json")
 const min = Number(option("min", 2))
-const max = Number(option("max", 20))
+const max = Number(option("max", 15))
 
 const payload = JSON.parse(readFileSync(file, "utf8"))
 const fills = [...payload.refuelings].sort(

@@ -18,7 +18,7 @@ const kmNumber = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 })
  * on l'ignore au lieu de polluer les moyennes, les graphiques et les min/max.
  */
 export const MIN_PLAUSIBLE_CONSUMPTION = 2
-export const MAX_PLAUSIBLE_CONSUMPTION = 20
+export const MAX_PLAUSIBLE_CONSUMPTION = 15
 
 export function isPlausibleConsumption(value: number | null | undefined): boolean {
   return (

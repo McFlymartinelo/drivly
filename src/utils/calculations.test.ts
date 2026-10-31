@@ -192,6 +192,7 @@ describe("plausibilité des consommations", () => {
   it("borne les valeurs de référence", () => {
     expect(isPlausibleConsumption(1.14)).toBe(false)
     expect(isPlausibleConsumption(64.61)).toBe(false)
+    expect(isPlausibleConsumption(16.67)).toBe(false)
     expect(isPlausibleConsumption(5.4)).toBe(true)
     expect(isPlausibleConsumption(null)).toBe(false)
   })
