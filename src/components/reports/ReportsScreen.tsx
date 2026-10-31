@@ -1,6 +1,16 @@
 import { addMonths, parseISO } from "date-fns"
-import { Calendar, Download, Fuel, Gauge, TrendingUp, Wallet } from "lucide-react"
+import {
+  Calendar,
+  ChevronRight,
+  Download,
+  Fuel,
+  Gauge,
+  TrendingUp,
+  Wallet,
+  Wrench,
+} from "lucide-react"
 import { useMemo, useState, type ReactNode } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   Area,
   AreaChart,
@@ -44,6 +54,7 @@ const tabs = [
   { id: "general", label: "GÉNÉRAL" },
   { id: "plein", label: "PLEIN" },
   { id: "depense", label: "DÉPENSE" },
+  { id: "entretien", label: "ENTRETIENS" },
   { id: "revenu", label: "REVENU" },
 ] as const
 
@@ -214,7 +225,12 @@ export function ReportsScreen() {
         <div className="no-scrollbar flex gap-1 overflow-x-auto px-2">
           {tabs.map((t) => {
             const active = tab === t.id
-            const accent = t.id === "plein" ? "text-orange border-orange" : "text-teal border-teal"
+            const accent =
+              t.id === "plein"
+                ? "text-orange border-orange"
+                : t.id === "entretien"
+                  ? "text-accent-entretien border-accent-entretien"
+                  : "text-teal border-teal"
             return (
               <button
                 key={t.id}
@@ -309,6 +325,7 @@ export function ReportsScreen() {
           color="#EF5350"
         />
       ) : null}
+      {count > 0 && tab === "entretien" ? <MaintenanceReports mains={mains} /> : null}
       {count > 0 && tab === "revenu" ? (
         <SimpleMoney
           items={revs.map((e) => ({ date: e.date, montant: e.montant, label: e.categorie }))}
@@ -738,6 +755,176 @@ function SimpleMoney({
   )
 }
 
+function MaintenanceReports({ mains }: { mains: Maintenance[] }) {
+  const navigate = useNavigate()
+
+  if (mains.length === 0) {
+    return (
+      <div className="px-3 pt-3">
+        <Card className="px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-ink">Aucun entretien sur cette période</p>
+          <p className="mt-1 text-[12px] text-muted">
+            Choisissez une autre période ou enregistrez un entretien.
+          </p>
+        </Card>
+      </div>
+    )
+  }
+
+  const sorted = [...mains].sort((a, b) => b.date.localeCompare(a.date))
+  const total = sorted.reduce((s, m) => s + m.coutTotal, 0)
+  const avg = total / sorted.length
+  const last = sorted[0]
+
+  const monthly = monthlyBuckets([], [], sorted, []).map((m) => ({
+    ...m,
+    label: `${m.key.slice(5)}/${m.key.slice(2, 4)}`,
+  }))
+
+  const byTypeMap = new Map<string, { name: string; count: number; total: number }>()
+  for (const m of sorted) {
+    const name = m.typeEntretien || "Entretien"
+    const cur = byTypeMap.get(name) ?? { name, count: 0, total: 0 }
+    cur.count += 1
+    cur.total += m.coutTotal
+    byTypeMap.set(name, cur)
+  }
+  const byType = [...byTypeMap.values()].sort((a, b) => b.total - a.total)
+  const maxType = byType[0]?.total ?? 1
+
+  const garage = sorted.filter((m) => m.typeIntervention === "Garage")
+  const diy = sorted.filter((m) => m.typeIntervention === "DIY")
+  const garageTotal = garage.reduce((s, m) => s + m.coutTotal, 0)
+  const diyTotal = diy.reduce((s, m) => s + m.coutTotal, 0)
+
+  return (
+    <div className="space-y-3 px-3 pt-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Kpi
+          tone="brown"
+          icon={<Wallet className="h-4 w-4" />}
+          title="Coût total"
+          value={formatMoney(total)}
+          lines={[
+            `${sorted.length} entretien${sorted.length > 1 ? "s" : ""}`,
+            `Moyenne ${formatMoney(avg)}`,
+          ]}
+        />
+        <Kpi
+          tone="brown"
+          icon={<Gauge className="h-4 w-4" />}
+          title="Dernier entretien"
+          value={formatKmGrouped(last.kilometrage)}
+          lines={[
+            formatIsoDate(last.date),
+            last.typeEntretien || "Entretien",
+          ]}
+        />
+        <Kpi
+          tone="gray"
+          icon={<Wrench className="h-4 w-4" />}
+          title="Garage"
+          value={formatMoney(garageTotal)}
+          lines={[`${garage.length} entretien${garage.length > 1 ? "s" : ""}`]}
+        />
+        <Kpi
+          tone="gray"
+          icon={<Wrench className="h-4 w-4" />}
+          title="DIY"
+          value={formatMoney(diyTotal)}
+          lines={[`${diy.length} entretien${diy.length > 1 ? "s" : ""}`]}
+        />
+      </div>
+
+      <ChartCard title="Coût des entretiens par mois" iconColor="brown">
+        <div className="h-52">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthly}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="entretien" name="Entretien" fill="#8D6E63" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </ChartCard>
+
+      <Card className="px-4 py-4">
+        <p className="mb-3 flex items-center gap-2 text-[14px] font-semibold">
+          <Wrench className="h-4 w-4 text-accent-entretien" />
+          Répartition par type
+        </p>
+        <div className="space-y-3">
+          {byType.map((item) => (
+            <div key={item.name}>
+              <div className="flex items-center justify-between gap-2 text-[13px]">
+                <span className="min-w-0 truncate font-medium">{item.name}</span>
+                <span className="shrink-0 font-semibold">{formatMoney(item.total)}</span>
+              </div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-app">
+                <div
+                  className="h-full rounded-full bg-accent-entretien"
+                  style={{ width: `${(item.total / maxType) * 100}%` }}
+                />
+              </div>
+              <p className="mt-0.5 text-[11px] text-muted">
+                {item.count} entretien{item.count > 1 ? "s" : ""}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <p className="flex items-center gap-2 px-4 pb-2 pt-4 text-[14px] font-semibold">
+          <Wrench className="h-4 w-4 text-accent-entretien" />
+          Historique des entretiens
+        </p>
+        <div className="divide-y divide-line">
+          {sorted.map((m) => {
+            const details = [m.referencesPieces, m.notes].filter(Boolean).join(" · ")
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => navigate(`/entree/maintenance/${m.id}`)}
+                className="flex w-full items-start gap-3 px-4 py-3 text-left"
+              >
+                <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#efebe9] text-accent-entretien">
+                  <Wrench className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[14px] font-semibold text-ink">
+                      {m.typeEntretien || "Entretien"}
+                    </span>
+                    <span className="shrink-0 text-[14px] font-bold text-ink">
+                      {formatMoney(m.coutTotal)}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 flex items-baseline justify-between gap-2 text-[12px] text-muted">
+                    <span className="truncate">
+                      {formatIsoDate(m.date)} · {formatKmGrouped(m.kilometrage)} ·{" "}
+                      {m.typeIntervention}
+                    </span>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                  </span>
+                  {details ? (
+                    <span className="mt-1 block truncate text-[12px] text-muted">
+                      {details}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 function Kpi({
   tone,
   icon,
@@ -745,7 +932,7 @@ function Kpi({
   value,
   lines,
 }: {
-  tone: "teal" | "orange" | "green" | "gray"
+  tone: "teal" | "orange" | "green" | "gray" | "brown"
   icon: ReactNode
   title: string
   value: string
@@ -756,6 +943,7 @@ function Kpi({
     orange: "text-orange bg-orange-soft",
     green: "text-accent-revenu bg-green-50",
     gray: "text-slate-500 bg-slate-100",
+    brown: "text-accent-entretien bg-[#efebe9]",
   }
   return (
     <Card className="px-3 py-3">
@@ -779,13 +967,19 @@ function ChartCard({
   children,
 }: {
   title: string
-  iconColor: "teal" | "orange"
+  iconColor: "teal" | "orange" | "brown"
   children: ReactNode
 }) {
+  const dot =
+    iconColor === "teal"
+      ? "bg-teal"
+      : iconColor === "orange"
+        ? "bg-orange"
+        : "bg-accent-entretien"
   return (
     <Card className="px-3 py-3">
       <p className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
-        <span className={cn("h-4 w-4 rounded-sm", iconColor === "teal" ? "bg-teal" : "bg-orange")} />
+        <span className={cn("h-4 w-4 rounded-sm", dot)} />
         {title}
       </p>
       {children}
