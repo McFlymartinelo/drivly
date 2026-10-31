@@ -124,7 +124,7 @@ console.log(
       markedPartial: changes.length,
       changes,
       remainingOutliers: remaining,
-      note: "Les valeurs restantes seront ignorées à l'affichage (bornes 2–20 L/100km).",
+      note: `Les valeurs restantes seront ignorées à l'affichage (bornes ${min}–${max} L/100km).`,
     },
     null,
     2,
