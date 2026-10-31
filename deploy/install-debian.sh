@@ -53,6 +53,14 @@ deploy_docker() {
     cp .env.example .env
     sed -i "s/^DRIVLY_PORT=.*/DRIVLY_PORT=${PORT}/" .env
   fi
+  if ! grep -Eq '^DRIVLY_TOKEN=.{16,}' .env; then
+    TOKEN="$(openssl rand -hex 32)"
+    if grep -q '^DRIVLY_TOKEN=' .env; then
+      sed -i "s/^DRIVLY_TOKEN=.*/DRIVLY_TOKEN=${TOKEN}/" .env
+    else
+      echo "DRIVLY_TOKEN=${TOKEN}" >> .env
+    fi
+  fi
   open_firewall
   docker compose up -d --build
   echo
@@ -60,6 +68,9 @@ deploy_docker() {
   echo "  Local  : http://127.0.0.1:${PORT}"
   echo "  Santé  : http://127.0.0.1:${PORT}/health"
   echo "Depuis l’extérieur : http://IP-DU-SERVEUR:${PORT}"
+  echo
+  echo "Jeton de sauvegarde (à saisir dans Drivly → Plus → Sauvegarde serveur) :"
+  grep '^DRIVLY_TOKEN=' .env | cut -d= -f2-
 }
 
 install_node() {

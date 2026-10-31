@@ -36,6 +36,61 @@ Les calculs (consommation, agrégats, rappels, import) sont couverts par des tes
 - L'import est **validé et confirmé** : aperçu du contenu, refus des fichiers invalides, export de sécurité automatique avant remplacement.
 - Un écran d'erreur global permet d'exporter ou de réinitialiser les données si une entrée corrompue bloque l'affichage.
 
+## Sauvegarde serveur (optionnelle)
+
+En plus de l'export JSON, Drivly peut envoyer une copie versionnée sur le serveur Debian. C'est un service `api` (Node + SQLite) ajouté au `compose.yaml` : la base est dans le volume Docker `drivly-data`, l'app reste local-first et fonctionne hors ligne.
+
+### Mise en place
+
+```bash
+# 1. Jeton (une seule fois)
+TOKEN=$(openssl rand -hex 32)
+grep -q '^DRIVLY_TOKEN=' .env \
+  && sed -i "s/^DRIVLY_TOKEN=.*/DRIVLY_TOKEN=${TOKEN}/" .env \
+  || echo "DRIVLY_TOKEN=${TOKEN}" >> .env
+
+# 2. (Re)lancer
+sudo docker compose up -d --build
+echo "$TOKEN"
+```
+
+Puis dans l'app : **Plus → Sauvegarde serveur → Configurer**, laisse l'adresse `/api` et colle le jeton. La sauvegarde automatique s'active (après chaque modification et quand l'app passe en arrière-plan).
+
+- **Restaurer** : Plus → Sauvegarde serveur → Restaurer, choisis une version. Un export local est téléchargé avant remplacement.
+- **Versionnage** : `DRIVLY_MAX_SNAPSHOTS` (50 par défaut) ; les envois identiques sont ignorés (empreinte SHA-256).
+- **API** : `GET /api/health`, `GET /api/backups`, `GET /api/backups/latest`, `GET /api/backups/:id`, `POST /api/backups` — protégés par `Authorization: Bearer <DRIVLY_TOKEN>`.
+
+### Sauvegarder la base SQLite elle-même
+
+Le volume survit aux mises à jour de l'image, mais pas à une suppression du volume. Copie régulière conseillée :
+
+```bash
+sudo docker run --rm \
+  -v drivly_drivly-data:/data \
+  -v "$PWD":/backup \
+  alpine tar czf /backup/drivly-data-$(date +%F).tgz -C /data .
+```
+
+⚠️ Utilise **HTTPS** (Certbot) : le jeton circule dans l'en-tête `Authorization`. En HTTP simple, il est visible sur le réseau.
+
+### Variante sans Docker
+
+Lance l'API avec Node 24 (aucune dépendance) et un service systemd, puis nginx proxifie `/api/` vers `127.0.0.1:3000` (déjà configuré dans `deploy/nginx.debian.conf`) :
+
+```bash
+sudo useradd --system --home /var/lib/drivly drivly
+sudo mkdir -p /var/lib/drivly && sudo chown drivly: /var/lib/drivly
+sudo install -m 0644 deploy/drivly-api.service /etc/systemd/system/
+sudo install -d /opt/drivly && sudo cp -r server /opt/drivly/
+sudo tee /etc/drivly-api.env >/dev/null <<EOF
+DRIVLY_TOKEN=$(openssl rand -hex 32)
+DRIVLY_DB=/var/lib/drivly/drivly.sqlite
+EOF
+sudo systemctl enable --now drivly-api
+sudo cat /etc/drivly-api.env
+```
+
+
 ## Déploiement Debian (accès distant)
 
 L’app est un site statique : nginx sert les fichiers, **la base reste dans le navigateur** de chaque appareil (IndexedDB). Ce n’est pas une base sur le serveur.

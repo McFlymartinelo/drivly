@@ -18,6 +18,7 @@ import { RefuelingForm } from "./components/plein/RefuelingForm"
 import { RemindersScreen } from "./components/rappels/RemindersScreen"
 import { VehicleForm } from "./components/vehicule/VehicleForm"
 import { AppProvider } from "./hooks/useApp"
+import { AutoBackup } from "./hooks/useServerBackup"
 
 // Recharts pèse l'essentiel du bundle : les rapports sont chargés à la demande.
 const ReportsScreen = lazy(() =>
@@ -37,6 +38,7 @@ function ScreenFallback() {
 export default function App() {
   return (
     <AppProvider>
+      <AutoBackup />
       <BrowserRouter>
         <div className="flex min-h-dvh justify-center bg-[#cfd8dc]">
           <div className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-app shadow-2xl">

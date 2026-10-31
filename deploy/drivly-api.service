@@ -1,0 +1,19 @@
+[Unit]
+Description=Drivly backup API
+After=network.target
+
+[Service]
+Type=simple
+User=drivly
+WorkingDirectory=/opt/drivly
+EnvironmentFile=/etc/drivly-api.env
+ExecStart=/usr/bin/node /opt/drivly/server/index.mjs
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/drivly
+
+[Install]
+WantedBy=multi-user.target

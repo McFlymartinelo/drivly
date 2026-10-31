@@ -30,6 +30,7 @@ import { BrandLogo } from "../shared/BrandLogo"
 import { Card } from "../shared/Form"
 import { ImportBackupDialog } from "../shared/ImportDialog"
 import { ConfirmDialog } from "../shared/Modal"
+import { ServerBackupCard } from "../serveur/ServerBackupCard"
 
 const LAST_EXPORT_KEY = "drivly.lastExport"
 
@@ -291,6 +292,8 @@ export function MoreScreen() {
           </div>
         </div>
       </Card>
+
+      <ServerBackupCard />
 
       <input
         ref={fileRef}

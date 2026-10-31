@@ -1,11 +1,12 @@
-import { Car, Download, Smartphone, Upload } from "lucide-react"
-import { useRef } from "react"
+import { Car, CloudDownload, Download, Smartphone, Upload } from "lucide-react"
+import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { VEHICLE_ID, loadDemoData } from "../../db/seed"
 import { useApp } from "../../hooks/useApp"
 import { useImportBackup } from "../../hooks/useImportBackup"
 import { showError, showToast } from "../../utils/toast"
 import { ImportBackupDialog } from "../shared/ImportDialog"
+import { ServerRestoreDialog } from "../serveur/ServerRestoreDialog"
 
 /**
  * Premier lancement : l'utilisateur choisit explicitement entre créer son
@@ -16,6 +17,7 @@ export function Onboarding() {
   const navigate = useNavigate()
   const { setVehicleId } = useApp()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [restoreOpen, setRestoreOpen] = useState(false)
   const importer = useImportBackup((payload) => {
     const first = payload.vehicles[0]
     if (first) setVehicleId(first.id)
@@ -80,6 +82,13 @@ export function Onboarding() {
           </button>
           <button
             type="button"
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-line bg-white py-3.5 text-[15px] font-semibold text-teal-deep"
+            onClick={() => setRestoreOpen(true)}
+          >
+            <CloudDownload className="h-4 w-4" /> Restaurer depuis le serveur
+          </button>
+          <button
+            type="button"
             className="flex w-full items-center justify-center gap-2 py-3 text-[13px] font-medium text-muted"
             onClick={() => fileRef.current?.click()}
           >
@@ -109,6 +118,7 @@ export function Onboarding() {
           }}
         />
         <ImportBackupDialog controller={importer} />
+        <ServerRestoreDialog open={restoreOpen} onClose={() => setRestoreOpen(false)} />
       </div>
     </div>
   )
