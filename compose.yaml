@@ -21,6 +21,9 @@ services:
       DRIVLY_TOKEN: ${DRIVLY_TOKEN:?Ajoute DRIVLY_TOKEN dans .env (openssl rand -hex 32)}
       DRIVLY_MAX_SNAPSHOTS: ${DRIVLY_MAX_SNAPSHOTS:-50}
       AUTH_SECRET: ${AUTH_SECRET:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
     volumes:
       - drivly-data:/data
     expose:

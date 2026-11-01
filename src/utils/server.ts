@@ -176,6 +176,24 @@ export async function registerServer(
   return { token: result.token, user: result.user }
 }
 
+/** Envoie le calendrier de notifications calculé côté client. */
+export async function syncNotifications(
+  config: ServerConfig,
+  items: Array<{
+    key: string
+    at: string
+    title: string
+    body: string
+    url?: string
+    tag?: string
+  }>,
+): Promise<{ scheduled: number }> {
+  return request(config, "/notifications/schedule", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  })
+}
+
 export async function checkServer(config: ServerConfig): Promise<boolean> {
   const result = await request<{ ok?: boolean }>(config, "/health")
   return result?.ok === true

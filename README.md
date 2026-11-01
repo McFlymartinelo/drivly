@@ -88,10 +88,54 @@ Côté serveur, chaque type d'entrée a sa table (`vehicles`, `refuelings`, `exp
   - `GET /api/health` (public, indique si les comptes sont activés)
   - `POST /api/auth/register` (`email`, `password`, `code` = `DRIVLY_TOKEN`)
   - `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+  - `POST /api/push/subscribe`, `POST /api/push/unsubscribe`, `POST /api/push/test`
+  - `POST /api/notifications/schedule`
   - `POST /api/backups` (payload complet, met à jour les tables)
   - `GET /api/backups`, `GET /api/backups/latest`, `GET /api/backups/:id`
   - `GET /api/entries/refuelings?limit=100&offset=0` (idem pour chaque table)
   - `GET /api/stats` (compteurs par table + nombre de versions)
+
+### Notifications (push)
+
+Deux canaux, calculés depuis les données locales :
+
+- **Rappels d'entretien** : 7 jours avant l'échéance (date ou kilométrage
+  estimé à partir de la vitesse moyenne).
+- **Prochain plein** : 3 jours avant la date estimée (intervalle moyen entre
+  pleins + autonomie restante).
+
+L'app calcule le calendrier et l'envoie au serveur
+(`POST /api/notifications/schedule`) : le serveur ne lit pas les données
+métier, il stocke et envoie à l'heure. Le push nécessite un compte serveur.
+
+Mise en place :
+
+```bash
+# 1. Clés VAPID (une seule fois)
+npx web-push generate-vapid-keys
+
+# 2. Les ajouter dans .env
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:toi@exemple.fr
+
+# 3. Rebuild
+sudo docker compose up -d --build
+```
+
+Puis dans l'app : **Plus → Notifications → Activer**.
+
+- **Android** : permission du navigateur, puis abonnement.
+- **iPhone** : installer d'abord la PWA (**Partager → Sur l'écran d'accueil**),
+  puis activer depuis l'icône. Safari dans un onglet ne reçoit pas de push
+  (iOS 16.4+).
+
+Le style se règle au même endroit : **Auto** (Instrument sur Android, Bandeau
+sur iPhone), **Instrument**, **Bandeau** ou **Carte**. Le bouton **Tester**
+affiche le style in-app et envoie un push.
+
+> Le push ne se teste pas dans le serveur de dev : le service worker de dev
+> n'inclut pas `push-sw.js`. Utiliser un build de production ou l'app installée.
 
 ### Peupler la base depuis un fichier
 

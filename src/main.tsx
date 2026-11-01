@@ -1,15 +1,37 @@
-import { StrictMode } from "react"
+import { StrictMode, useSyncExternalStore } from "react"
 import { createRoot } from "react-dom/client"
 import App from "./App.tsx"
+import { NotifyProvider } from "./aura/notify/react"
 import { ThemeProvider } from "./aura/react"
 import { ErrorBoundary } from "./components/shared/ErrorBoundary.tsx"
 import { ToastHost } from "./components/shared/Toast.tsx"
 import { seedIfEmpty } from "./db/seed.ts"
 import { initPwa } from "./pwa.ts"
+import {
+  getNotificationPrefs,
+  subscribeNotificationPrefs,
+} from "./utils/notifications.ts"
 import { ensurePersistentStorage } from "./utils/storage.ts"
 import "./index.css"
 
 initPwa()
+
+function Root() {
+  const prefs = useSyncExternalStore(
+    subscribeNotificationPrefs,
+    getNotificationPrefs,
+    getNotificationPrefs,
+  )
+
+  return (
+    <NotifyProvider appName="Drivly" style={prefs.style}>
+      <ErrorBoundary>
+        <App />
+        <ToastHost />
+      </ErrorBoundary>
+    </NotifyProvider>
+  )
+}
 
 async function boot() {
   // Persistance du stockage : indispensable pour un carnet tenu des années.
@@ -22,10 +44,7 @@ async function boot() {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <ThemeProvider defaultTheme="light" defaultAccent="teal" storageKey="drivly">
-        <ErrorBoundary>
-          <App />
-          <ToastHost />
-        </ErrorBoundary>
+        <Root />
       </ThemeProvider>
     </StrictMode>,
   )

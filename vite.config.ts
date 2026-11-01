@@ -59,6 +59,7 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff2,json}"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/health$/],
+        importScripts: ["push-sw.js"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -90,7 +91,7 @@ export default defineConfig({
       },
       devOptions: {
         enabled: true,
-        type: "module",
+        type: "classic",
       },
     }),
   ],

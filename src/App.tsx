@@ -19,6 +19,7 @@ import { RemindersScreen } from "./components/rappels/RemindersScreen"
 import { VehicleForm } from "./components/vehicule/VehicleForm"
 import { AppProvider } from "./hooks/useApp"
 import { AutoBackup } from "./hooks/useServerBackup"
+import { NotificationSync } from "./hooks/useNotificationSync"
 
 // Recharts pèse l'essentiel du bundle : les rapports sont chargés à la demande.
 const ReportsScreen = lazy(() =>
@@ -40,6 +41,7 @@ export default function App() {
     <AppProvider>
       <AutoBackup />
       <BrowserRouter>
+        <NotificationSync />
         <div className="aura-app flex min-h-dvh justify-center sm:p-4">
           <div className="app-frame relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-app sm:h-[calc(100dvh-2rem)]">
             <Routes>

@@ -1,0 +1,12 @@
+{
+  "name": "drivly-api",
+  "private": true,
+  "type": "module",
+  "description": "API de sauvegarde Drivly (Node + SQLite + comptes + push).",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

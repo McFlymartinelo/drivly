@@ -56,6 +56,21 @@ pour l'utiliser hors ligne.
   intégré à **Plus → Sauvegarde serveur**.
 - Détails et contrat d'API : `src/aura/auth/README.md`.
 
+## Notifications
+
+Module Aura `src/aura/notify/` : notifications in-app + push Web.
+
+- Le calendrier est **calculé côté client** (`src/utils/notifications.ts`) :
+  rappels 7 jours avant, prochain plein 3 jours avant. Le serveur ne lit pas
+  les données métier, il stocke et envoie.
+- Push : `web-push` côté serveur (`server/package.json`), clés VAPID dans
+  `.env`, service worker `public/push-sw.js` importé par Workbox.
+- iOS : PWA installée obligatoire (16.4+). Afficher les instructions.
+- Style : prefs locales (`drivly.notifications.v1`), `NotifyProvider` dans
+  `main.tsx`, sélecteur dans **Plus → Notifications**.
+- Ne jamais envoyer de push sans opt-in. Ne pas tester dans le serveur de dev
+  (le SW de dev n'inclut pas `importScripts`).
+
 ## Knowledge Graph Navigation
 - Ce projet utilise Graphify pour la cartographie des dépendances et du contexte.
 - Ne charge pas et ne lis pas l'ensemble des dossiers à l'aveugle.

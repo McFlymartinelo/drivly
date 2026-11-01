@@ -1,15 +1,22 @@
 import http from "node:http"
+import { readFileSync } from "node:fs"
 import { timingSafeEqual } from "node:crypto"
 import { createStore, isEntryTable } from "./store.mjs"
 import { normalizePayload } from "./validate.mjs"
 import { createAuthService } from "../src/aura/auth/server/index.mjs"
 import { createSqliteDb } from "../src/aura/auth/server/adapters/sqlite.mjs"
 import { createNodeAuthHandler } from "../src/aura/auth/server/adapters/node.mjs"
+import { createPushService } from "../src/aura/notify/server/index.mjs"
+import { createWebPushSender } from "../src/aura/notify/server/webpush.mjs"
 
 const PORT = Number(process.env.PORT ?? 3000)
 const DB_PATH = process.env.DRIVLY_DB ?? "/data/drivly.sqlite"
 const TOKEN = process.env.DRIVLY_TOKEN ?? ""
 const AUTH_SECRET = (process.env.AUTH_SECRET ?? "").trim()
+const VAPID_PUBLIC_KEY = (process.env.VAPID_PUBLIC_KEY ?? "").trim()
+const VAPID_PRIVATE_KEY = (process.env.VAPID_PRIVATE_KEY ?? "").trim()
+const VAPID_SUBJECT =
+  process.env.VAPID_SUBJECT?.trim() || "mailto:admin@localhost"
 const MAX_SNAPSHOTS = Math.max(1, Number(process.env.DRIVLY_MAX_SNAPSHOTS ?? 50))
 const MAX_BODY = 20 * 1024 * 1024
 const CORS_ORIGINS = (process.env.DRIVLY_CORS_ORIGIN ?? "")
@@ -38,6 +45,12 @@ let authDb = null
 
 if (AUTH_SECRET.length >= 32) {
   authDb = createSqliteDb({ file: DB_PATH })
+  authDb.exec(
+    readFileSync(
+      new URL("../src/aura/notify/server/schema.sql", import.meta.url),
+      "utf8",
+    ),
+  )
   authService = createAuthService({
     db: authDb,
     // Pas de SMTP sur un serveur auto-hébergé : les OTP et la réinitialisation
@@ -63,6 +76,33 @@ if (AUTH_SECRET.length >= 32) {
   console.warn("[auth] AUTH_SECRET trop court (32 caractères minimum) : comptes désactivés.")
 } else {
   console.warn("[auth] AUTH_SECRET absent : comptes désactivés, authentification par jeton uniquement.")
+}
+
+/**
+ * Push : activé seulement si les comptes et les clés VAPID sont présents.
+ * Le calendrier est calculé côté client et envoyé via /api/notifications/schedule.
+ */
+let pushService = null
+if (authService) {
+  let sender = null
+  if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    try {
+      sender = await createWebPushSender({
+        publicKey: VAPID_PUBLIC_KEY,
+        privateKey: VAPID_PRIVATE_KEY,
+        subject: VAPID_SUBJECT,
+      })
+    } catch (error) {
+      console.error("[push] initialisation impossible :", error?.message ?? error)
+    }
+  }
+
+  pushService = createPushService({
+    db: authDb,
+    sender,
+    vapidPublicKey: VAPID_PUBLIC_KEY || null,
+    appName: "Drivly",
+  })
 }
 
 function json(res, status, body) {
@@ -113,6 +153,21 @@ async function authorized(req) {
   }
 }
 
+/** Session obligatoire (les routes push ont besoin d'un user_id). */
+async function sessionUser(req) {
+  if (!authService) {
+    throw Object.assign(new Error("Comptes désactivés sur ce serveur."), {
+      status: 503,
+    })
+  }
+  const header = req.headers.authorization ?? ""
+  const match = /^Bearer (.+)$/.exec(header)
+  if (!match) {
+    throw Object.assign(new Error("Authentification requise."), { status: 401 })
+  }
+  return authService.requireSession({ token: match[1] })
+}
+
 function readJson(req) {
   return new Promise((resolve, reject) => {
     const chunks = []
@@ -156,6 +211,50 @@ async function handle(req, res) {
 
   // Routes /api/auth/* : inscription, connexion, session.
   if (handleAuth && (await handleAuth(req, res))) return
+
+  // Push : clé publique (publique), abonnements et calendrier (session).
+  if (path === "/api/push/vapid" && req.method === "GET") {
+    json(res, 200, {
+      configured: Boolean(pushService?.isConfigured()),
+      publicKey: VAPID_PUBLIC_KEY || null,
+    })
+    return
+  }
+
+  if (
+    path.startsWith("/api/push/") ||
+    path === "/api/notifications/schedule"
+  ) {
+    if (!pushService) {
+      json(res, 503, { error: "Push non configuré sur ce serveur." })
+      return
+    }
+
+    const user = await sessionUser(req)
+
+    if (path === "/api/push/subscribe" && req.method === "POST") {
+      const body = await readJson(req)
+      json(res, 200, await pushService.subscribe(user.id, body))
+      return
+    }
+    if (path === "/api/push/unsubscribe" && req.method === "POST") {
+      const body = await readJson(req)
+      json(res, 200, await pushService.unsubscribe(user.id, body.endpoint))
+      return
+    }
+    if (path === "/api/push/test" && req.method === "POST") {
+      json(res, 200, await pushService.test(user.id))
+      return
+    }
+    if (path === "/api/notifications/schedule" && req.method === "POST") {
+      const body = await readJson(req)
+      json(res, 200, await pushService.syncSchedule(user.id, body.items))
+      return
+    }
+
+    json(res, 404, { error: "Route inconnue." })
+    return
+  }
 
   if (!(await authorized(req))) {
     json(res, 401, { error: "Jeton invalide." })
@@ -251,9 +350,29 @@ function shutdown() {
 process.on("SIGTERM", shutdown)
 process.on("SIGINT", shutdown)
 
+if (pushService?.isConfigured()) {
+  const tick = () => {
+    pushService
+      .sendDue()
+      .then((result) => {
+        if (result.sent > 0) {
+          console.log(`[push] ${result.sent} notification(s) envoyée(s)`)
+        }
+      })
+      .catch((error) => console.error("[push]", error?.message ?? error))
+  }
+
+  setTimeout(tick, 10_000).unref()
+  setInterval(tick, 5 * 60_000).unref()
+  setInterval(() => {
+    pushService.cleanup({ days: 30 }).catch(() => {})
+  }, 24 * 3600_000).unref()
+}
+
 server.listen(PORT, "0.0.0.0", () => {
   console.log(
     `Drivly API sur :${PORT} — base ${DB_PATH} — ${MAX_SNAPSHOTS} sauvegardes max` +
-      ` — comptes ${authService ? "activés" : "désactivés"}`,
+      ` — comptes ${authService ? "activés" : "désactivés"}` +
+      ` — push ${pushService?.isConfigured() ? "activé" : "désactivé"}`,
   )
 })

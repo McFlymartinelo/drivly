@@ -1,5 +1,21 @@
 @import "tailwindcss";
 @import "./aura/aura.css";
+@import "./aura/notify/notify.css";
+
+/* Notifications alignées sur le cadre de l'app (430 px) sur desktop. */
+.aura-notify-viewport {
+  left: 50%;
+  right: auto;
+  width: min(calc(100% - 24px), 430px);
+  transform: translateX(-50%);
+}
+
+.aura-notify-viewport[data-style="banner"] {
+  left: 50%;
+  right: auto;
+  width: min(100%, 430px);
+  transform: translateX(-50%);
+}
 
 /* ---------------------------------------------------------------------------
    Pont entre les tokens Aura et les noms historiques de Drivly.

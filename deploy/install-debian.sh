@@ -70,6 +70,30 @@ deploy_docker() {
       echo "AUTH_SECRET=${SECRET}" >> .env
     fi
   fi
+  # Push : clés VAPID (nécessaires pour les notifications hors de l'app).
+  if ! grep -Eq '^VAPID_PUBLIC_KEY=.+' .env; then
+    echo "Génération des clés VAPID…"
+    VAPID_JSON="$(npx --yes web-push generate-vapid-keys --json 2>/dev/null || true)"
+    if [ -n "${VAPID_JSON}" ]; then
+      VAPID_PUB="$(printf '%s' "${VAPID_JSON}" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).publicKey))")"
+      VAPID_PRIV="$(printf '%s' "${VAPID_JSON}" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).privateKey))")"
+      if grep -q '^VAPID_PUBLIC_KEY=' .env; then
+        sed -i "s|^VAPID_PUBLIC_KEY=.*|VAPID_PUBLIC_KEY=${VAPID_PUB}|" .env
+      else
+        echo "VAPID_PUBLIC_KEY=${VAPID_PUB}" >> .env
+      fi
+      if grep -q '^VAPID_PRIVATE_KEY=' .env; then
+        sed -i "s|^VAPID_PRIVATE_KEY=.*|VAPID_PRIVATE_KEY=${VAPID_PRIV}|" .env
+      else
+        echo "VAPID_PRIVATE_KEY=${VAPID_PRIV}" >> .env
+      fi
+      if ! grep -Eq '^VAPID_SUBJECT=.+' .env; then
+        echo "VAPID_SUBJECT=mailto:admin@localhost" >> .env
+      fi
+    else
+      echo "Clés VAPID non générées (npx indisponible). Ajoute-les dans .env."
+    fi
+  fi
   open_firewall
   docker compose up -d --build
   echo

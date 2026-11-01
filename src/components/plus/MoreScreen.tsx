@@ -31,6 +31,7 @@ import { Card } from "../shared/Form"
 import { ImportBackupDialog } from "../shared/ImportDialog"
 import { ConfirmDialog } from "../shared/Modal"
 import { ServerBackupCard } from "../serveur/ServerBackupCard"
+import { NotificationsCard } from "./NotificationsCard"
 
 const LAST_EXPORT_KEY = "drivly.lastExport"
 
@@ -292,6 +293,8 @@ export function MoreScreen() {
           </div>
         </div>
       </Card>
+
+      <NotificationsCard />
 
       <ServerBackupCard />
 

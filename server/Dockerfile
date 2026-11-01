@@ -3,7 +3,12 @@
 FROM node:24-alpine
 WORKDIR /app
 
+COPY server/package.json ./package.json
+RUN npm install --omit=dev --no-audit --no-fund
+
 COPY server ./server
+COPY src/aura/auth ./src/aura/auth
+COPY src/aura/notify ./src/aura/notify
 COPY src/aura/auth ./src/aura/auth
 
 RUN mkdir -p /data && chown -R node:node /app /data

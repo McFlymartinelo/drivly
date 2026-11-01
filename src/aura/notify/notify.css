@@ -1,0 +1,284 @@
+/* Aura Notify — à importer après aura.css.
+   Styles : instrument (Android), banner (iOS), card.
+   Le style « auto » est résolu côté React, pas en CSS. */
+
+.aura-notify-viewport {
+  position: fixed;
+  z-index: 140;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.aura-notify-viewport[data-position="bottom"] {
+  bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+.aura-notify-viewport[data-position="top"] {
+  top: calc(12px + env(safe-area-inset-top));
+}
+
+/* Bandeau : pleine largeur, collé en haut. */
+.aura-notify-viewport[data-style="banner"] {
+  left: 0;
+  right: 0;
+  top: 0;
+  gap: 0;
+  padding-top: env(safe-area-inset-top);
+}
+
+.aura-notify {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  pointer-events: auto;
+  border: 1px solid var(--aura-line);
+  background: var(--aura-surface);
+  color: var(--aura-ink);
+  box-shadow:
+    0 2px 6px oklch(22% 0.02 250 / 0.06),
+    0 16px 32px -20px oklch(22% 0.02 250 / 0.5);
+  animation: aura-notify-in var(--aura-dur-3) var(--aura-ease-out) both;
+}
+
+.aura-notify[data-tone="danger"] {
+  border-color: color-mix(in oklab, var(--aura-danger) 35%, var(--aura-line));
+}
+
+.aura-notify__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.aura-notify__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.aura-notify__message {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--aura-ink-2);
+}
+
+.aura-notify__kicker {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--aura-accent-strong);
+}
+
+.aura-notify__action {
+  flex: none;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--aura-accent-strong);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.aura-notify__action:active {
+  background: var(--aura-accent-soft);
+}
+
+.aura-notify__close {
+  flex: none;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--aura-surface-2);
+  color: var(--aura-ink-3);
+  cursor: pointer;
+}
+
+.aura-notify__close svg {
+  width: 12px;
+  height: 12px;
+}
+
+.aura-notify__progress {
+  position: absolute;
+  right: 10px;
+  bottom: 5px;
+  left: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--aura-surface-2);
+  overflow: hidden;
+}
+
+.aura-notify__progress::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--aura-accent-solid);
+  transform-origin: left;
+  animation: aura-notify-progress var(--aura-notify-duration, 6s) linear
+    forwards;
+}
+
+/* ---------------------------------------------------------------- */
+/* Instrument — rail d'accent, compact, sans icône                  */
+/* ---------------------------------------------------------------- */
+
+.aura-notify-viewport[data-style="instrument"] .aura-notify {
+  min-height: 52px;
+  padding: 8px 8px 8px 0;
+  border-radius: 13px;
+}
+
+.aura-notify-viewport[data-style="instrument"] .aura-notify::before {
+  content: "";
+  align-self: stretch;
+  flex: none;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: var(--aura-accent-solid);
+}
+
+.aura-notify-viewport[data-style="instrument"] .aura-notify[data-tone="danger"]::before {
+  background: var(--aura-danger);
+}
+
+.aura-notify-viewport[data-style="instrument"] .aura-notify[data-tone="success"]::before {
+  background: var(--aura-success);
+}
+
+.aura-notify-viewport[data-style="instrument"] .aura-notify[data-tone="warn"]::before {
+  background: var(--aura-warn);
+}
+
+/* ---------------------------------------------------------------- */
+/* Bandeau — pleine largeur, translucide, icône d'app               */
+/* ---------------------------------------------------------------- */
+
+.aura-notify-viewport[data-style="banner"] .aura-notify {
+  padding: 10px 12px 12px;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0 0 18px 18px;
+  background: color-mix(in oklab, var(--aura-surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  animation-name: aura-notify-in-top;
+}
+
+.aura-notify-viewport[data-style="banner"] .aura-notify__mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--aura-accent-solid);
+  color: var(--aura-on-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.aura-notify-viewport[data-style="banner"] .aura-notify__app {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--aura-ink-3);
+}
+
+.aura-notify-viewport[data-style="banner"] .aura-notify__app time {
+  margin-left: auto;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------------------------------------------------------------- */
+/* Carte — icône, titre, détail, progression                        */
+/* ---------------------------------------------------------------- */
+
+.aura-notify-viewport[data-style="card"] .aura-notify {
+  align-items: flex-start;
+  padding: 11px 10px 13px;
+  border-radius: 17px;
+}
+
+.aura-notify-viewport[data-style="card"] .aura-notify__mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--aura-accent-soft);
+  color: var(--aura-accent-strong);
+}
+
+.aura-notify-viewport[data-style="card"] .aura-notify[data-tone="danger"] .aura-notify__mark {
+  background: var(--aura-danger-soft);
+  color: var(--aura-danger);
+}
+
+.aura-notify-viewport[data-style="card"] .aura-notify__mark svg {
+  width: 17px;
+  height: 17px;
+}
+
+@keyframes aura-notify-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aura-notify-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aura-notify-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-notify,
+  .aura-notify__progress::after {
+    animation-duration: 0.001ms;
+  }
+}

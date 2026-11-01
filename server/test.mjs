@@ -4,9 +4,11 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
+import webpush from "web-push"
 import { createStore, ENTRIES } from "./store.mjs"
 
 const TOKEN = "integration-token-0123456789"
+const VAPID = webpush.generateVAPIDKeys()
 const PORT = String(4100 + Math.floor(Math.random() * 400))
 const BASE = `http://127.0.0.1:${PORT}/api`
 
@@ -100,6 +102,9 @@ test("API de sauvegarde", async () => {
       DRIVLY_MAX_SNAPSHOTS: "3",
       DRIVLY_CORS_ORIGIN: "",
       AUTH_SECRET: "drivly-test-auth-secret-0123456789-abcdef",
+      VAPID_PUBLIC_KEY: VAPID.publicKey,
+      VAPID_PRIVATE_KEY: VAPID.privateKey,
+      VAPID_SUBJECT: "mailto:test@example.com",
     },
     stdio: "ignore",
   })
@@ -172,6 +177,53 @@ test("API de sauvegarde", async () => {
       }),
     })
     assert.equal(badPassword.status, 401)
+
+    // --- Push : VAPID, abonnement, calendrier -------------------------
+    const vapid = await fetch(`${BASE}/push/vapid`)
+    assert.equal(vapid.status, 200)
+    const vapidBody = await vapid.json()
+    assert.equal(vapidBody.configured, true)
+    assert.ok(vapidBody.publicKey)
+
+    const pushHeaders = {
+      Authorization: `Bearer ${session.token}`,
+      "Content-Type": "application/json",
+    }
+
+    const anonymousPush = await fetch(`${BASE}/push/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    })
+    assert.equal(anonymousPush.status, 401)
+
+    const subscribe = await fetch(`${BASE}/push/subscribe`, {
+      method: "POST",
+      headers: pushHeaders,
+      body: JSON.stringify({
+        endpoint: "https://push.example.com/test",
+        keys: { p256dh: "p256dh-test", auth: "auth-test" },
+      }),
+    })
+    assert.equal(subscribe.status, 200)
+
+    const scheduled = await fetch(`${BASE}/notifications/schedule`, {
+      method: "POST",
+      headers: pushHeaders,
+      body: JSON.stringify({
+        items: [
+          {
+            key: "reminder:test",
+            at: new Date(Date.now() + 86_400_000).toISOString(),
+            title: "Contrôle technique",
+            body: "Dans 3 jours",
+            url: "/rappels",
+          },
+        ],
+      }),
+    })
+    assert.equal(scheduled.status, 200)
+    assert.equal((await scheduled.json()).scheduled, 1)
 
     const first = await call("/backups", {
       method: "POST",
