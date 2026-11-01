@@ -3,6 +3,7 @@ dist
 .git
 .claude
 .cursor
+brand-identity
 *.md
 .env
 .env.*

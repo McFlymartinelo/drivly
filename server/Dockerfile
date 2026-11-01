@@ -9,9 +9,8 @@ RUN npm install --omit=dev --no-audit --no-fund
 COPY server ./server
 COPY src/aura/auth ./src/aura/auth
 COPY src/aura/notify ./src/aura/notify
-COPY src/aura/auth ./src/aura/auth
 
-RUN mkdir -p /data && chown -R node:node /app /data
+RUN mkdir -p /data && chown -R node:node /data
 
 USER node
 ENV PORT=3000 \
