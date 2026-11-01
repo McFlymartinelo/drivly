@@ -19,7 +19,7 @@ function statusText(
   lastSavedAt: string | null,
   error: string | null,
 ): string {
-  if (state === "disabled") return "Non configurée"
+  if (state === "disabled") return "Non activée"
   if (state === "saving") return "Envoi en cours…"
   if (state === "error") return error ?? "Erreur de connexion"
   if (lastSavedAt) return `Dernière sauvegarde : ${formatIsoDateTime(lastSavedAt)}`
@@ -60,7 +60,7 @@ export function ServerBackupCard() {
   function disable() {
     clearServerConfig()
     setConfig(null)
-    showToast("Sauvegarde serveur désactivée.")
+    showToast("Sauvegarde en ligne désactivée.")
   }
 
   return (
@@ -76,7 +76,7 @@ export function ServerBackupCard() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="text-[14px] font-semibold text-ink">Sauvegarde serveur</p>
+              <p className="text-[14px] font-semibold text-ink">Sauvegarde en ligne</p>
               <span
                 className={`h-2 w-2 rounded-full ${
                   status.state === "saved"
@@ -137,7 +137,7 @@ export function ServerBackupCard() {
                     className="flex items-center gap-1 rounded-full bg-app px-3 py-1.5 text-[12px] font-semibold text-muted"
                     onClick={() => setConfigOpen(true)}
                   >
-                    <Settings2 className="h-3.5 w-3.5" /> Configurer
+                    <Settings2 className="h-3.5 w-3.5" /> Gérer
                   </button>
                   <button
                     type="button"
@@ -154,7 +154,7 @@ export function ServerBackupCard() {
                 className="mt-2 rounded-full bg-teal px-3 py-1.5 text-[12px] font-bold text-white"
                 onClick={() => setConfigOpen(true)}
               >
-                Configurer la sauvegarde
+                Activer la sauvegarde
               </button>
             )}
           </div>
@@ -164,8 +164,8 @@ export function ServerBackupCard() {
       <Modal
         open={configOpen}
         onClose={() => setConfigOpen(false)}
-        title="Sauvegarde serveur"
-        description="Connecte l'application à l'API de ton serveur Debian."
+        title="Sauvegarde en ligne"
+        description="Connecte-toi pour retrouver ton carnet sur un autre appareil."
       >
         <ServerConfigForm
           initial={config}
