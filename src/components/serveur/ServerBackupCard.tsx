@@ -80,7 +80,7 @@ export function ServerBackupCard() {
               <span
                 className={`h-2 w-2 rounded-full ${
                   status.state === "saved"
-                    ? "bg-emerald-500"
+                    ? "bg-lime ring-1 ring-black/10"
                     : status.state === "error"
                       ? "bg-danger"
                       : status.state === "saving"

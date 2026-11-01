@@ -46,7 +46,7 @@ import { Onboarding } from "../onboarding/Onboarding"
 import { MonthHero } from "./MonthHero"
 
 const REMINDER_TEXT: Record<ReminderLevel, string> = {
-  ok: "text-emerald-600",
+  ok: "text-muted",
   soon: "text-orange",
   late: "text-danger",
 }

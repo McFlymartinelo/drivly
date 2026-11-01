@@ -2,10 +2,10 @@ import { ChevronDown, Download, Loader2, Search, Share2 } from "lucide-react"
 import { useState } from "react"
 import { useLocation } from "react-router-dom"
 import { useApp } from "../../hooks/useApp"
-import { formatKm } from "../../utils/format"
+import { formatKmGrouped } from "../../utils/format"
 import { exportAll, shareOrDownloadJson } from "../../utils/export"
 import { showError, showToast } from "../../utils/toast"
-import { BrandLogo } from "../shared/BrandLogo"
+import { DrivlyLogo } from "../shared/DrivlyLogo"
 
 export function Header({
   onOpenVehicles,
@@ -45,20 +45,18 @@ export function Header({
         type="button"
         onClick={onOpenVehicles}
         aria-label="Changer de véhicule"
-        className="aura-press -ml-1.5 flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl p-1.5 text-left"
+        className="aura-press flex min-w-0 flex-1 items-center gap-4 rounded-2xl text-left"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-teal-soft p-1.5 text-teal-deep ring-1 ring-black/5">
-          <BrandLogo marque={vehicle?.marque} className="h-7 w-7" />
-        </span>
+        <DrivlyLogo />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-semibold leading-tight tracking-[-0.01em] text-ink">
-            {vehicle?.marque ?? "Véhicule"}
+            {vehicle?.nom ?? "Véhicule"}
           </span>
           <span className="block truncate text-[11px] leading-tight text-muted">
             {!ready
               ? "Chargement…"
               : vehicle
-                ? `${vehicle.nom} · ${formatKm(vehicle.kmActuel)}`
+                ? formatKmGrouped(vehicle.kmActuel)
                 : "Aucun véhicule"}
           </span>
         </span>

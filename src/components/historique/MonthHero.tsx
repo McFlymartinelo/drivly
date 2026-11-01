@@ -2,7 +2,7 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react"
 import { useId } from "react"
 import {
   formatDecimal,
-  formatKm,
+  formatKmGrouped,
   formatMoney,
 } from "../../utils/format"
 
@@ -41,7 +41,7 @@ export function MonthHero({
         <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
           <HeroStat
             label="Distance"
-            value={distance ? formatKm(distance) : "—"}
+            value={distance ? formatKmGrouped(distance) : "-"}
           />
           <HeroStat
             label="Conso"

@@ -168,7 +168,7 @@ export function NotificationsCard() {
             : null
 
   const dot = prefs.enabled && status?.subscribed
-    ? "bg-emerald-500"
+    ? "bg-lime ring-1 ring-black/10"
     : prefs.enabled
       ? "bg-orange"
       : "bg-slate-300"

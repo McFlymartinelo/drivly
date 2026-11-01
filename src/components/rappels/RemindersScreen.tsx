@@ -15,7 +15,7 @@ import { showError, showToast } from "../../utils/toast"
 import { Card } from "../shared/Form"
 
 const LEVEL_TEXT: Record<ReminderLevel, string> = {
-  ok: "text-emerald-600",
+  ok: "text-muted",
   soon: "text-orange",
   late: "text-danger",
 }

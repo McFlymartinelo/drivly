@@ -1,4 +1,1 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#00AEEF"/>
-  <path fill="#fff" d="M18 40c0-8 6.5-14 16-14h2.2l2-6h6.3l-1.4 4.2c3.6 1.2 6.9 3.8 8.4 7.8H52v4h-4.2c-.5 3.4-3.4 6-6.8 6H23c-2.8 0-5-2.2-5-4zm7.5-2.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm16 0a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Drivly"><title>Drivly</title><rect width="64" height="64" rx="14" fill="#2457F5"/><g transform="translate(4.72 3.84) scale(0.44)"><path fill="#FFFFFF" fill-rule="evenodd" d="M24 16H62C90 16 108 36 108 64C108 92 90 112 62 112H24Q16 112 16 104V24Q16 16 24 16ZM60 35C60 35 38 58 38 72A22 22 0 0 0 82 72C82 58 60 35 60 35Z"/></g></svg>

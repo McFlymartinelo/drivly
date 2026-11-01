@@ -16,6 +16,11 @@ import "./index.css"
 
 initPwa()
 
+// Migration : les installations précédentes stockaient l'accent « teal ».
+if (localStorage.getItem("drivly-accent") === "teal") {
+  localStorage.setItem("drivly-accent", "drivly")
+}
+
 function Root() {
   const prefs = useSyncExternalStore(
     subscribeNotificationPrefs,
@@ -43,7 +48,7 @@ async function boot() {
   }
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <ThemeProvider defaultTheme="light" defaultAccent="teal" storageKey="drivly">
+      <ThemeProvider defaultTheme="light" defaultAccent="drivly" storageKey="drivly">
         <Root />
       </ThemeProvider>
     </StrictMode>,

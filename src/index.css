@@ -17,6 +17,38 @@
   transform: translateX(-50%);
 }
 
+/* En-tête : zone de protection du logo (½ H = 16 px pour un symbole de 32 px). */
+.aura-appbar {
+  padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
+}
+
+/* Le logo change de variante selon la largeur. Ces règles sont volontairement
+   non layerisées : le `img { display: block }` d'Aura prime sur les utilitaires
+   Tailwind autrement. */
+.drivly-logo-symbol {
+  display: block;
+  flex: none;
+  height: 32px;
+  width: auto;
+}
+
+.drivly-logo-horizontal {
+  display: none;
+  flex: none;
+  height: 41px;
+  width: auto;
+}
+
+@media (min-width: 640px) {
+  .drivly-logo-symbol {
+    display: none;
+  }
+
+  .drivly-logo-horizontal {
+    display: block;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Pont entre les tokens Aura et les noms historiques de Drivly.
    Les écrans existants continuent de fonctionner, mais héritent du nouveau
@@ -33,6 +65,9 @@
   --color-teal-deep: var(--aura-accent-strong);
   --color-teal-muted: oklch(82% 0.07 var(--aura-accent-h));
   --color-teal-soft: var(--aura-accent-soft);
+
+  --color-lime: var(--aura-lime);
+  --color-lime-soft: var(--aura-lime-soft);
 
   --color-orange: var(--aura-warn);
   --color-orange-dark: oklch(60% 0.16 55);
