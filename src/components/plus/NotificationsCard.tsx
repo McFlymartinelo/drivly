@@ -143,12 +143,19 @@ export function NotificationsCard() {
 
     try {
       const result = await push.test()
-      showToast(
-        result.sent > 0
-          ? "Push test envoyé."
-          : "Push non délivré : vérifie l'abonnement et les clés VAPID.",
-        { tone: result.sent > 0 ? "success" : "error" },
-      )
+      if (result.sent > 0) {
+        showToast("Push test envoyé.", { tone: "success" })
+      } else if (result.skipped) {
+        showToast(
+          "Aucun appareil abonné. Désactive puis réactive les notifications.",
+          { tone: "info" },
+        )
+      } else {
+        showToast(
+          "Le serveur n'a pas confirmé l'envoi. Si la notification est arrivée sur ton téléphone, c'est bon ; sinon, désactive puis réactive les notifications.",
+          { tone: "info" },
+        )
+      }
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : "Test push impossible.",

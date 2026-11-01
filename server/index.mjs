@@ -243,7 +243,11 @@ async function handle(req, res) {
       return
     }
     if (path === "/api/push/test" && req.method === "POST") {
-      json(res, 200, await pushService.test(user.id))
+      const result = await pushService.test(user.id)
+      console.log(
+        `[push] test user=${user.id} sent=${result.sent} failed=${result.failed ?? 0} skipped=${result.skipped ? "yes" : "no"}`,
+      )
+      json(res, 200, result)
       return
     }
     if (path === "/api/notifications/schedule" && req.method === "POST") {

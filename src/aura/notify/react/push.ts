@@ -50,13 +50,20 @@ export interface PushClientOptions {
   fetch?: typeof fetch
 }
 
+export interface PushTestResult {
+  sent: number
+  failed?: number
+  skipped?: boolean
+  reason?: string
+}
+
 export interface PushClient {
   context: () => PushContext
   status: () => Promise<PushStatus>
   enable: () => Promise<PushEnableResult>
   disable: () => Promise<void>
   sync: () => Promise<void>
-  test: () => Promise<{ sent: number }>
+  test: () => Promise<PushTestResult>
   showLocal: (title: string, body: string, url?: string) => Promise<boolean>
   isEnabled: () => boolean
 }
@@ -289,7 +296,7 @@ export function createPushClient(
     }
   }
 
-  async function test(): Promise<{ sent: number }> {
+  async function test(): Promise<PushTestResult> {
     return request(testPath, { method: "POST" })
   }
 
