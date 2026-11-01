@@ -85,7 +85,7 @@
   --color-line-strong: var(--aura-line-strong);
 
   --color-chart-plein: var(--aura-accent-solid);
-  --color-chart-depense: oklch(70.3% 0.1546 269.84);
+  --color-chart-depense: oklch(18.31% 0.0309 263.38);
   --color-chart-entretien: oklch(50.3% 0.0338 266.08);
   --color-chart-revenu: oklch(55% 0.13 123);
   --color-chart-teal: var(--aura-accent-solid);
@@ -104,7 +104,7 @@
   --color-accent-itineraire: oklch(55% 0.03 245);
   --color-accent-entretien: oklch(50.3% 0.0338 266.08);
   --color-accent-revenu: oklch(55% 0.13 123);
-  --color-accent-depense: oklch(70.3% 0.1546 269.84);
+  --color-accent-depense: oklch(18.31% 0.0309 263.38);
   --color-accent-plein: var(--aura-accent-solid);
 
   --radius-lg: var(--aura-r-md);

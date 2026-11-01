@@ -995,8 +995,8 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
             >
               <defs>
                 <linearGradient id="fuelConsoFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-chart-depense)" stopOpacity={0.28} />
-                  <stop offset="100%" stopColor="var(--color-chart-depense)" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="var(--color-chart-entretien)" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="var(--color-chart-entretien)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="var(--aura-line)" strokeDasharray="2 4" vertical={false} />
@@ -1024,7 +1024,7 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
                 type="monotone"
                 dataKey="conso"
                 name="L/100km"
-                stroke="var(--color-chart-depense)"
+                stroke="var(--color-chart-entretien)"
                 strokeWidth={2.5}
                 fill="url(#fuelConsoFill)"
                 dot={false}
