@@ -314,25 +314,9 @@ export function HistoryScreen() {
     return { comparison, expense }
   }
 
-  const heroMonth = months[0]
-  const heroMeta = heroMonth ? monthStats.get(heroMonth.key) : undefined
-  const heroInsight = heroMonth ? insightFor(heroMonth.key) : undefined
-  const heroFills = heroMonth
-    ? heroMonth.items.filter((event) => event.kind === "refueling").length
-    : 0
-  const heroTotal = heroMonth
-    ? heroMonth.items.reduce(
-        (sum, event) =>
-          event.kind === "revenue" || event.kind === "anniversary"
-            ? sum
-            : sum + (event.amount ?? 0),
-        0,
-      )
-    : 0
-  const heroTrend = [...months]
-    .reverse()
-    .slice(-6)
-    .map((month) =>
+  const totalsByMonth = new Map(
+    months.map((month) => [
+      month.key,
       month.items.reduce(
         (sum, event) =>
           event.kind === "revenue" || event.kind === "anniversary"
@@ -340,20 +324,55 @@ export function HistoryScreen() {
             : sum + (event.amount ?? 0),
         0,
       ),
+    ]),
+  )
+  const ascendingMonths = [...months].reverse()
+  const monthCards = months
+    .filter((month) =>
+      month.items.some((event) => event.kind !== "anniversary"),
     )
+    .map((month) => {
+      const meta = monthStats.get(month.key)
+      const insight = insightFor(month.key)
+      const index = ascendingMonths.findIndex((item) => item.key === month.key)
+      const trend = ascendingMonths
+        .slice(Math.max(0, index - 5), index + 1)
+        .map((item) => totalsByMonth.get(item.key) ?? 0)
+      return {
+        key: month.key,
+        label: month.label,
+        total: totalsByMonth.get(month.key) ?? 0,
+        distance: meta?.distance ?? null,
+        consumption: meta?.consumption ?? null,
+        comparison: insight.comparison,
+        fills: month.items.filter((event) => event.kind === "refueling").length,
+        trend,
+      }
+    })
 
   return (
     <div className="pb-6">
-      {heroMonth ? (
-        <MonthHero
-          label={heroMonth.label}
-          total={heroTotal}
-          distance={heroMeta?.distance ?? null}
-          consumption={heroMeta?.consumption ?? null}
-          comparison={heroInsight?.comparison ?? null}
-          fills={heroFills}
-          trend={heroTrend}
-        />
+      {monthCards.length > 0 ? (
+        <div
+          className="no-scrollbar flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto scroll-px-4 px-4 pb-1 pt-4"
+          role="region"
+          aria-label="Résumés mensuels — fais glisser pour parcourir les mois"
+          tabIndex={0}
+        >
+          {monthCards.map((card) => (
+            <div key={card.key} className="w-[92%] shrink-0 snap-start">
+              <MonthHero
+                label={card.label}
+                total={card.total}
+                distance={card.distance}
+                consumption={card.consumption}
+                comparison={card.comparison}
+                fills={card.fills}
+                trend={card.trend}
+              />
+            </div>
+          ))}
+        </div>
       ) : null}
 
       <section className="px-4 pt-3">
