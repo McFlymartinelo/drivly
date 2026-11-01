@@ -61,6 +61,15 @@ deploy_docker() {
       echo "DRIVLY_TOKEN=${TOKEN}" >> .env
     fi
   fi
+  # Comptes utilisateurs : activés si AUTH_SECRET est présent.
+  if ! grep -Eq '^AUTH_SECRET=.{32,}' .env; then
+    SECRET="$(openssl rand -hex 32)"
+    if grep -q '^AUTH_SECRET=' .env; then
+      sed -i "s/^AUTH_SECRET=.*/AUTH_SECRET=${SECRET}/" .env
+    else
+      echo "AUTH_SECRET=${SECRET}" >> .env
+    fi
+  fi
   open_firewall
   docker compose up -d --build
   echo

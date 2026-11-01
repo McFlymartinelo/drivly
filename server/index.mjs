@@ -2,10 +2,14 @@ import http from "node:http"
 import { timingSafeEqual } from "node:crypto"
 import { createStore, isEntryTable } from "./store.mjs"
 import { normalizePayload } from "./validate.mjs"
+import { createAuthService } from "../src/aura/auth/server/index.mjs"
+import { createSqliteDb } from "../src/aura/auth/server/adapters/sqlite.mjs"
+import { createNodeAuthHandler } from "../src/aura/auth/server/adapters/node.mjs"
 
 const PORT = Number(process.env.PORT ?? 3000)
 const DB_PATH = process.env.DRIVLY_DB ?? "/data/drivly.sqlite"
 const TOKEN = process.env.DRIVLY_TOKEN ?? ""
+const AUTH_SECRET = (process.env.AUTH_SECRET ?? "").trim()
 const MAX_SNAPSHOTS = Math.max(1, Number(process.env.DRIVLY_MAX_SNAPSHOTS ?? 50))
 const MAX_BODY = 20 * 1024 * 1024
 const CORS_ORIGINS = (process.env.DRIVLY_CORS_ORIGIN ?? "")
@@ -24,6 +28,43 @@ if (TOKEN.length < 16) {
 const store = createStore(DB_PATH, { maxSnapshots: MAX_SNAPSHOTS })
 store.rebuildFromLatest()
 
+/**
+ * Comptes optionnels : activés seulement si AUTH_SECRET est fourni.
+ * Sans lui, le serveur reste en mode « jeton » (comportement historique).
+ */
+let authService = null
+let handleAuth = null
+let authDb = null
+
+if (AUTH_SECRET.length >= 32) {
+  authDb = createSqliteDb({ file: DB_PATH })
+  authService = createAuthService({
+    db: authDb,
+    // Pas de SMTP sur un serveur auto-hébergé : les OTP et la réinitialisation
+    // par email sont désactivés. La connexion se fait par mot de passe.
+    mailer: async () => {
+      throw new Error("Email non configuré sur ce serveur.")
+    },
+    config: {
+      secret: AUTH_SECRET,
+      appName: "Drivly",
+      requireOtpOnLogin: false,
+      requireEmailVerification: false,
+      exposeToken: true,
+      allowTokenInProduction: true,
+      registrationCode: TOKEN,
+      secureCookies: false,
+      rateLimitMax: 30,
+      rateLimitOtpMax: 10,
+    },
+  })
+  handleAuth = createNodeAuthHandler(authService, { basePath: "/api/auth" })
+} else if (AUTH_SECRET.length > 0) {
+  console.warn("[auth] AUTH_SECRET trop court (32 caractères minimum) : comptes désactivés.")
+} else {
+  console.warn("[auth] AUTH_SECRET absent : comptes désactivés, authentification par jeton uniquement.")
+}
+
 function json(res, status, body) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -39,17 +80,37 @@ function applyCors(req, res) {
   res.setHeader("Access-Control-Allow-Origin", origin)
   res.setHeader("Vary", "Origin")
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type")
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
   res.setHeader("Access-Control-Max-Age", "600")
 }
 
-function authorized(req) {
+function legacyAuthorized(req) {
   const header = req.headers.authorization ?? ""
   const match = /^Bearer (.+)$/.exec(header)
   if (!match) return false
   const provided = Buffer.from(match[1])
   const expected = Buffer.from(TOKEN)
   return provided.length === expected.length && timingSafeEqual(provided, expected)
+}
+
+/**
+ * Accepte soit une session de compte (JWT Aura), soit l'ancien jeton serveur.
+ * Le jeton reste valable pour ne pas casser les installations existantes.
+ */
+async function authorized(req) {
+  if (legacyAuthorized(req)) return true
+  if (!authService) return false
+
+  const header = req.headers.authorization ?? ""
+  const match = /^Bearer (.+)$/.exec(header)
+  if (!match) return false
+
+  try {
+    await authService.requireSession({ token: match[1] })
+    return true
+  } catch {
+    return false
+  }
 }
 
 function readJson(req) {
@@ -89,11 +150,14 @@ async function handle(req, res) {
   const path = url.pathname.replace(/\/+$/, "") || "/"
 
   if (path === "/api/health" && req.method === "GET") {
-    json(res, 200, { ok: true, service: "drivly-api" })
+    json(res, 200, { ok: true, service: "drivly-api", auth: Boolean(authService) })
     return
   }
 
-  if (!authorized(req)) {
+  // Routes /api/auth/* : inscription, connexion, session.
+  if (handleAuth && (await handleAuth(req, res))) return
+
+  if (!(await authorized(req))) {
     json(res, 401, { error: "Jeton invalide." })
     return
   }
@@ -176,6 +240,9 @@ function shutdown() {
     try {
       store.close()
     } catch {}
+    try {
+      authDb?.close()
+    } catch {}
     process.exit(0)
   })
   setTimeout(() => process.exit(0), 3000).unref()
@@ -186,6 +253,7 @@ process.on("SIGINT", shutdown)
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(
-    `Drivly API sur :${PORT} — base ${DB_PATH} — ${MAX_SNAPSHOTS} sauvegardes max`,
+    `Drivly API sur :${PORT} — base ${DB_PATH} — ${MAX_SNAPSHOTS} sauvegardes max` +
+      ` — comptes ${authService ? "activés" : "désactivés"}`,
   )
 })

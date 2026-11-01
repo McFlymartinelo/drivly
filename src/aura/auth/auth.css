@@ -1,0 +1,138 @@
+/* Aura Auth — écran plein, à importer après aura.css. */
+
+.aura-auth {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(32px + env(safe-area-inset-top)) 20px
+    calc(32px + env(safe-area-inset-bottom));
+  background: var(--aura-bg);
+  color: var(--aura-ink);
+}
+
+.aura-auth__panel {
+  width: 100%;
+  max-width: 400px;
+  padding: 26px 22px 22px;
+  border: 1px solid var(--aura-line);
+  border-radius: var(--aura-r-xl);
+  background: var(--aura-surface);
+  box-shadow: var(--aura-shadow-2);
+}
+
+.aura-auth__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.aura-auth__mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--aura-accent-soft);
+  color: var(--aura-accent-strong);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.aura-auth__head h1 {
+  margin: 0;
+}
+
+.aura-auth__head p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.aura-auth__form {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.aura-auth__code {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 0.35em;
+  font-variant-numeric: tabular-nums;
+  padding-left: 0.35em;
+}
+
+.aura-auth__notice {
+  margin: 16px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--aura-accent-strong);
+}
+
+.aura-auth__dev {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--aura-surface-2);
+  color: var(--aura-ink-3);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.aura-auth__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 18px;
+  font-size: 12.5px;
+}
+
+.aura-auth__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--aura-accent-strong);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aura-auth__link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.aura-auth__link:disabled {
+  color: var(--aura-ink-3);
+  cursor: default;
+  text-decoration: none;
+}
+
+.aura-auth__legal {
+  max-width: 400px;
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--aura-ink-3);
+  text-wrap: pretty;
+}
+
+@media (max-width: 420px) {
+  .aura-auth {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .aura-auth__panel {
+    padding: 22px 18px 18px;
+    border-radius: var(--aura-r-lg);
+  }
+}

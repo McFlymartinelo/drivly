@@ -97,6 +97,9 @@ export function ServerBackupCard() {
             >
               {statusText(status.state, status.lastSavedAt, status.error)}
             </p>
+            {config?.email ? (
+              <p className="mt-0.5 text-[11px] text-muted">Compte : {config.email}</p>
+            ) : null}
 
             {config ? (
               <>
@@ -141,7 +144,7 @@ export function ServerBackupCard() {
                     className="rounded-full px-2 py-1.5 text-[12px] font-medium text-muted"
                     onClick={disable}
                   >
-                    Désactiver
+                    {config.email ? "Se déconnecter" : "Désactiver"}
                   </button>
                 </div>
               </>

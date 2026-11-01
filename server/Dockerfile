@@ -4,6 +4,7 @@ FROM node:24-alpine
 WORKDIR /app
 
 COPY server ./server
+COPY src/aura/auth ./src/aura/auth
 
 RUN mkdir -p /data && chown -R node:node /app /data
 

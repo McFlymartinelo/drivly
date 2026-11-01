@@ -5,9 +5,25 @@ const CONFIG_KEY = "drivly.server.v1"
 export interface ServerConfig {
   /** Base de l'API : « /api » par défaut (même origine, proxifié par nginx). */
   baseUrl: string
+  /** Jeton de session (compte) ou ancien jeton statique du serveur. */
   token: string
+  /** Email du compte connecté, si le serveur gère les comptes. */
+  email?: string
   /** Sauvegarde automatique après chaque modification. */
   auto: boolean
+}
+
+export interface ServerUser {
+  id: number
+  email: string
+  displayName: string | null
+  username: string | null
+  isAdmin: boolean
+}
+
+export interface ServerSession {
+  token: string
+  user: ServerUser
 }
 
 export interface BackupMeta {
@@ -36,6 +52,7 @@ export function loadServerConfig(): ServerConfig | null {
     return {
       baseUrl: typeof parsed.baseUrl === "string" && parsed.baseUrl ? parsed.baseUrl : "/api",
       token: parsed.token,
+      email: typeof parsed.email === "string" && parsed.email ? parsed.email : undefined,
       auto: parsed.auto !== false,
     }
   } catch {
@@ -49,6 +66,7 @@ export function saveServerConfig(config: ServerConfig) {
     JSON.stringify({
       baseUrl: normalizeBase(config.baseUrl),
       token: config.token.trim(),
+      email: config.email?.trim() || undefined,
       auto: config.auto,
     }),
   )
@@ -65,18 +83,23 @@ export function normalizeBase(baseUrl: string): string {
   return trimmed.replace(/\/+$/, "")
 }
 
-function endpoint(config: ServerConfig, path: string): string {
-  return `${normalizeBase(config.baseUrl)}${path}`
+function endpoint(baseUrl: string, path: string): string {
+  return `${normalizeBase(baseUrl)}${path}`
 }
 
-async function request<T>(config: ServerConfig, path: string, init?: RequestInit): Promise<T> {
+async function requestWithToken<T>(
+  baseUrl: string,
+  path: string,
+  token: string | null,
+  init?: RequestInit,
+): Promise<T> {
   let response: Response
   try {
-    response = await fetch(endpoint(config, path), {
+    response = await fetch(endpoint(baseUrl, path), {
       ...init,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${config.token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
     })
@@ -103,6 +126,54 @@ async function request<T>(config: ServerConfig, path: string, init?: RequestInit
   }
 
   return data as T
+}
+
+function request<T>(config: ServerConfig, path: string, init?: RequestInit): Promise<T> {
+  return requestWithToken<T>(config.baseUrl, path, config.token, init)
+}
+
+/** Connexion à un compte serveur. Renvoie un jeton de session. */
+export async function loginServer(
+  baseUrl: string,
+  email: string,
+  password: string,
+): Promise<ServerSession> {
+  const result = await requestWithToken<{ token?: string; user?: ServerUser }>(
+    baseUrl,
+    "/auth/login",
+    null,
+    {
+      method: "POST",
+      body: JSON.stringify({ identifier: email.trim(), password }),
+    },
+  )
+
+  if (!result.token || !result.user) {
+    throw new Error(
+      "Ce serveur ne gère pas encore les comptes. Mets-le à jour, ou utilise un jeton.",
+    )
+  }
+  return { token: result.token, user: result.user }
+}
+
+/** Crée un compte sur le serveur. `code` = DRIVLY_TOKEN du serveur. */
+export async function registerServer(
+  baseUrl: string,
+  input: { email: string; password: string; displayName?: string; code: string },
+): Promise<ServerSession> {
+  const result = await requestWithToken<{ token?: string; user?: ServerUser }>(
+    baseUrl,
+    "/auth/register",
+    null,
+    { method: "POST", body: JSON.stringify(input) },
+  )
+
+  if (!result.token || !result.user) {
+    throw new Error(
+      "Compte créé, mais aucune session renvoyée. Mets le serveur à jour.",
+    )
+  }
+  return { token: result.token, user: result.user }
 }
 
 export async function checkServer(config: ServerConfig): Promise<boolean> {

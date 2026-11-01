@@ -99,6 +99,7 @@ test("API de sauvegarde", async () => {
       DRIVLY_TOKEN: TOKEN,
       DRIVLY_MAX_SNAPSHOTS: "3",
       DRIVLY_CORS_ORIGIN: "",
+      AUTH_SECRET: "drivly-test-auth-secret-0123456789-abcdef",
     },
     stdio: "ignore",
   })
@@ -107,9 +108,70 @@ test("API de sauvegarde", async () => {
     await waitForServer()
 
     assert.equal((await call("/health", { headers: { Authorization: "" } })).status, 200)
+    const health = await call("/health", { headers: { Authorization: "" } })
+    assert.equal(health.body.auth, true)
 
     const unauthorized = await fetch(`${BASE}/backups`)
     assert.equal(unauthorized.status, 401)
+
+    // --- Comptes : inscription protégée par le jeton serveur -------------
+    const badSignup = await fetch(`${BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "test@drivly.local",
+        password: "motdepasse123",
+        code: "mauvais-code",
+      }),
+    })
+    assert.equal(badSignup.status, 403)
+
+    const signup = await fetch(`${BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "test@drivly.local",
+        password: "motdepasse123",
+        displayName: "Test",
+        code: TOKEN,
+      }),
+    })
+    assert.equal(signup.status, 201)
+    const session = await signup.json()
+    assert.ok(session.token)
+    assert.equal(session.user.email, "test@drivly.local")
+
+    const accountMe = await fetch(`${BASE}/auth/me`, {
+      headers: { Authorization: `Bearer ${session.token}` },
+    })
+    assert.equal(accountMe.status, 200)
+    assert.equal((await accountMe.json()).user.displayName, "Test")
+
+    const accountBackups = await fetch(`${BASE}/backups`, {
+      headers: { Authorization: `Bearer ${session.token}` },
+    })
+    assert.equal(accountBackups.status, 200)
+
+    const login = await fetch(`${BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identifier: "test@drivly.local",
+        password: "motdepasse123",
+      }),
+    })
+    assert.equal(login.status, 200)
+    assert.ok((await login.json()).token)
+
+    const badPassword = await fetch(`${BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identifier: "test@drivly.local",
+        password: "faux",
+      }),
+    })
+    assert.equal(badPassword.status, 401)
 
     const first = await call("/backups", {
       method: "POST",

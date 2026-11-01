@@ -20,6 +20,7 @@ services:
     environment:
       DRIVLY_TOKEN: ${DRIVLY_TOKEN:?Ajoute DRIVLY_TOKEN dans .env (openssl rand -hex 32)}
       DRIVLY_MAX_SNAPSHOTS: ${DRIVLY_MAX_SNAPSHOTS:-50}
+      AUTH_SECRET: ${AUTH_SECRET:-}
     volumes:
       - drivly-data:/data
     expose:

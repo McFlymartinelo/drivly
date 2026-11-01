@@ -43,25 +43,51 @@ En plus de l'export JSON, Drivly peut envoyer une copie versionnée sur le serve
 ### Mise en place
 
 ```bash
-# 1. Jeton (une seule fois)
+# 1. Jeton serveur (une seule fois)
 TOKEN=$(openssl rand -hex 32)
 grep -q '^DRIVLY_TOKEN=' .env \
   && sed -i "s/^DRIVLY_TOKEN=.*/DRIVLY_TOKEN=${TOKEN}/" .env \
   || echo "DRIVLY_TOKEN=${TOKEN}" >> .env
 
-# 2. (Re)lancer
+# 2. Secret des comptes (32+ caractères)
+SECRET=$(openssl rand -hex 32)
+grep -q '^AUTH_SECRET=' .env \
+  && sed -i "s/^AUTH_SECRET=.*/AUTH_SECRET=${SECRET}/" .env \
+  || echo "AUTH_SECRET=${SECRET}" >> .env
+
+# 3. (Re)lancer
 sudo docker compose up -d --build
-echo "$TOKEN"
+echo "Jeton serveur : $TOKEN"
 ```
 
-Puis dans l'app : **Plus → Sauvegarde serveur → Configurer**, laisse l'adresse `/api` et colle le jeton. La sauvegarde automatique s'active : **chaque entrée ajoutée, modifiée ou supprimée est écrite dans les tables SQL du serveur en moins d'une seconde** (et quand l'app passe en arrière-plan).
+Puis dans l'app : **Plus → Sauvegarde serveur → Configurer**. Deux modes :
+
+- **Compte** (recommandé) : email + mot de passe. Pour le premier compte, ajoute
+  la **clé serveur** (`DRIVLY_TOKEN`) : elle autorise la création de comptes.
+  Les connexions suivantes n'utilisent que l'email et le mot de passe.
+- **Jeton** : l'ancien mode, colle directement `DRIVLY_TOKEN`.
+
+La sauvegarde automatique s'active ensuite : **chaque entrée ajoutée, modifiée
+ou supprimée est écrite dans les tables SQL du serveur en moins d'une seconde**
+(et quand l'app passe en arrière-plan).
+
+> Les comptes sont **optionnels et côté serveur uniquement** : sans
+> `AUTH_SECRET`, le serveur reste en mode jeton. L'app continue de fonctionner
+> hors ligne, sans compte.
+>
+> Les sauvegardes sont partagées entre les comptes d'un même serveur (usage
+> familial). Il n'y a pas de réinitialisation de mot de passe par email : le
+> serveur n'a pas de SMTP. Un mot de passe oublié se règle côté base (voir
+> `src/aura/auth/README.md`).
 
 Côté serveur, chaque type d'entrée a sa table (`vehicles`, `refuelings`, `expenses`, `maintenances`, `reminders`, `readings`, `trips`, `checklists`) avec les colonnes utiles (`vehicle_id`, `date`, `kilometrage`, `montant`…) **et** le JSON complet dans `data`. Une version de sauvegarde est créée à chaque changement (dédupliquée par empreinte SHA-256).
 
 - **Restaurer** : Plus → Sauvegarde serveur → Restaurer, choisis une version. Un export local est téléchargé avant remplacement.
 - **Versionnage** : `DRIVLY_MAX_SNAPSHOTS` (50 par défaut).
-- **API** (protégée par `Authorization: Bearer <DRIVLY_TOKEN>`) :
-  - `GET /api/health`
+- **API** (protégée par une session de compte **ou** `Authorization: Bearer <DRIVLY_TOKEN>`) :
+  - `GET /api/health` (public, indique si les comptes sont activés)
+  - `POST /api/auth/register` (`email`, `password`, `code` = `DRIVLY_TOKEN`)
+  - `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
   - `POST /api/backups` (payload complet, met à jour les tables)
   - `GET /api/backups`, `GET /api/backups/latest`, `GET /api/backups/:id`
   - `GET /api/entries/refuelings?limit=100&offset=0` (idem pour chaque table)
