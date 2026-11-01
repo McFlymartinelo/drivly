@@ -93,7 +93,7 @@ export function RefuelingDetail() {
         </>
       }
     >
-      <div className="bg-orange px-4 pb-4">
+      <div className="bg-teal px-4 pb-4">
         <div className="flex items-center gap-2">
           <button type="button" aria-label="Précédent" onClick={() => go(-1)} className="text-white disabled:opacity-30" disabled={index <= 0}>
             <ChevronLeft className="h-6 w-6" />
@@ -125,13 +125,13 @@ export function RefuelingDetail() {
             </div>
             <div className="mt-4 border-t border-line pt-4 text-center">
               <p className="text-[13px] text-muted">Coût total</p>
-              <p className="text-[28px] font-bold text-orange">{formatMoney(fill.coutTotal)}</p>
+              <p className="text-[28px] font-bold text-teal">{formatMoney(fill.coutTotal)}</p>
             </div>
           </Card>
         </div>
 
         <Card className="px-4 py-4">
-          <p className="text-[15px] font-bold text-orange">{fill.carburant}</p>
+          <p className="text-[15px] font-bold text-teal">{fill.carburant}</p>
           <div className="mt-3 grid grid-cols-3 text-center text-[13px]">
             <div>
               <p className="text-muted">Prix / L</p>

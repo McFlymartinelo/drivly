@@ -567,7 +567,7 @@ export function HistoryScreen() {
 
 function TimelineDot({ kind }: { kind: TimelineEvent["kind"] }) {
   const map: Record<TimelineEvent["kind"], string> = {
-    refueling: "bg-orange",
+    refueling: "bg-teal",
     expense: "bg-accent-depense",
     revenue: "bg-accent-revenu",
     maintenance: "bg-accent-entretien",

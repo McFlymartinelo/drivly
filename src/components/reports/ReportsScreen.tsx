@@ -18,9 +18,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
+  ComposedChart,
   Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -69,8 +68,90 @@ const periods: Array<{ id: PeriodId; label: string }> = [
   { id: "custom", label: "Perso" },
 ]
 
-const PIE_COLORS = ["var(--color-chart-plein)", "var(--color-chart-depense)", "var(--color-chart-entretien)", "var(--color-chart-revenu)"]
-const STATION_COLORS = ["oklch(60% 0.13 155)", "var(--color-chart-teal)", "oklch(62% 0.17 355)", "var(--color-chart-depense)", "var(--color-chart-plein)", "oklch(52% 0.17 300)"]
+const PIE_COLORS = [
+  "var(--color-chart-plein)",
+  "var(--color-chart-depense)",
+  "var(--color-chart-entretien)",
+]
+const STATION_COLORS = [
+  "var(--color-chart-plein)",
+  "var(--color-chart-depense)",
+  "var(--color-chart-entretien)",
+  "var(--color-chart-revenu)",
+  "oklch(38% 0.05 265)",
+  "oklch(82% 0.05 265)",
+]
+
+const TOOLTIP_STYLE = {
+  borderRadius: 12,
+  border: "1px solid var(--aura-line)",
+  background: "var(--aura-surface)",
+  boxShadow: "var(--aura-shadow-2)",
+  fontSize: 11,
+  padding: "8px 10px",
+}
+
+interface ChartRow {
+  key: string
+  label: string
+  plein: number
+  depense: number
+  entretien: number
+  revenu: number
+  litres: number
+}
+
+/**
+ * Au-delà de 18 points, on agrège par année : des barres mensuelles sur
+ * 8 ans deviennent des traits d'un pixel, illisibles.
+ */
+function groupChartData(
+  rows: Array<Omit<ChartRow, "label">>,
+  maxGroups = 18,
+): { rows: ChartRow[]; yearly: boolean } {
+  if (rows.length <= maxGroups) {
+    return {
+      rows: rows.map((row) => ({
+        ...row,
+        label: `${row.key.slice(5)}/${row.key.slice(2, 4)}`,
+      })),
+      yearly: false,
+    }
+  }
+
+  const map = new Map<string, ChartRow>()
+  for (const row of rows) {
+    const year = row.key.slice(0, 4)
+    const current =
+      map.get(year) ?? {
+        key: year,
+        label: year,
+        plein: 0,
+        depense: 0,
+        entretien: 0,
+        revenu: 0,
+        litres: 0,
+      }
+    current.plein += row.plein
+    current.depense += row.depense
+    current.entretien += row.entretien
+    current.revenu += row.revenu
+    current.litres += row.litres
+    map.set(year, current)
+  }
+
+  return {
+    rows: [...map.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    yearly: true,
+  }
+}
+
+function compactMoney(value: number): string {
+  return `${new Intl.NumberFormat("fr-FR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value)} €`
+}
 
 export function ReportsScreen() {
   const { ready, refuelings, expenses, revenues, maintenances } = useApp()
@@ -227,7 +308,7 @@ export function ReportsScreen() {
             const active = tab === t.id
             const accent =
               t.id === "plein"
-                ? "text-orange border-orange"
+                ? "text-teal border-teal"
                 : t.id === "entretien"
                   ? "text-accent-entretien border-accent-entretien"
                   : "text-teal border-teal"
@@ -362,18 +443,16 @@ function GeneralReports({
       : 0
   const days = periodDays(range.from, range.to)
 
-  const monthly = monthlyBuckets(fills, exps, mains, revs).map((m) => ({
-    ...m,
-    label: `${m.key.slice(5)}/${m.key.slice(2, 4)}`,
-  }))
+  const chart = groupChartData(monthlyBuckets(fills, exps, mains, revs))
+  const monthly = chart.rows
+  const periodLabel = chart.yearly ? "par an" : "par mois"
+  const hasRevenue = totalRev > 0
 
   const donut = [
     { name: "Plein", value: fuelCost },
     { name: "Dépense", value: expCost },
     { name: "Entretien", value: maintCost },
   ].filter((d) => d.value > 0)
-
-  const donutData = donut.length ? donut : [{ name: "Plein", value: 1 }]
 
   const odo = [...fills]
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -403,7 +482,7 @@ function GeneralReports({
           lines={[`Moyenne journalière ${Math.round(distance / days)} km`]}
         />
         <Kpi
-          tone="orange"
+          tone="teal"
           icon={<Wallet className="h-4 w-4" />}
           title="Coût"
           value={formatMoney(totalCost)}
@@ -413,7 +492,7 @@ function GeneralReports({
           ]}
         />
         <Kpi
-          tone="green"
+          tone="lime"
           icon={<Wallet className="h-4 w-4" />}
           title="Revenus"
           value={formatMoney(totalRev)}
@@ -424,69 +503,193 @@ function GeneralReports({
         />
       </div>
 
-      <ChartCard title="Graphique des coûts et revenus" iconColor="teal">
+      <ChartCard
+        title={`Coûts ${periodLabel}${hasRevenue ? " et revenus" : ""}`}
+        iconColor="teal"
+      >
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthly}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="plein" name="Plein" fill="var(--color-chart-plein)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="depense" name="Dépense" fill="var(--color-chart-depense)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="entretien" name="Entretien" fill="var(--color-chart-entretien)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="revenu" name="Le revenu" fill="var(--color-chart-revenu)" radius={[4, 4, 0, 0]} />
-            </BarChart>
+            <ComposedChart data={monthly} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="var(--aura-line)" strokeDasharray="2 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                width={54}
+                tickFormatter={(value) => compactMoney(Number(value))}
+              />
+              <Tooltip
+                cursor={{ fill: "var(--aura-accent-soft)", opacity: 0.5 }}
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={{ color: "var(--aura-ink-3)", fontSize: 10, marginBottom: 4 }}
+                itemStyle={{ color: "var(--aura-ink)", fontSize: 11 }}
+                formatter={(value, name) => [formatMoney(Number(value)), name]}
+              />
+              <Bar stackId="costs" dataKey="plein" name="Plein" fill="var(--color-chart-plein)" maxBarSize={28} />
+              <Bar stackId="costs" dataKey="depense" name="Dépense" fill="var(--color-chart-depense)" maxBarSize={28} />
+              <Bar
+                stackId="costs"
+                dataKey="entretien"
+                name="Entretien"
+                fill="var(--color-chart-entretien)"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={28}
+              />
+              {hasRevenue ? (
+                <Line
+                  type="monotone"
+                  dataKey="revenu"
+                  name="Revenus"
+                  stroke="var(--color-chart-revenu)"
+                  strokeWidth={2.5}
+                  dot={{
+                    r: 3,
+                    fill: "var(--color-chart-revenu)",
+                    stroke: "var(--aura-ink)",
+                    strokeWidth: 1,
+                  }}
+                  activeDot={{ r: 4 }}
+                />
+              ) : null}
+            </ComposedChart>
           </ResponsiveContainer>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted">
+          {[
+            { name: "Plein", color: "var(--color-chart-plein)" },
+            { name: "Dépense", color: "var(--color-chart-depense)" },
+            { name: "Entretien", color: "var(--color-chart-entretien)" },
+            ...(hasRevenue
+              ? [{ name: "Revenus", color: "var(--color-chart-revenu)" }]
+              : []),
+          ].map((item) => (
+            <span key={item.name} className="inline-flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: item.color }}
+              />
+              {item.name}
+            </span>
+          ))}
         </div>
       </ChartCard>
 
-      <ChartCard title="Graphique de comparaison des coûts" iconColor="teal">
-        <div className="relative h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={donutData}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={55}
-                outerRadius={80}
-                paddingAngle={2}
-              >
-                {donutData.map((entry, i) => (
-                  <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v) => formatMoney(Number(v))} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-          {donut.length <= 1 ? (
-            <p className="pointer-events-none absolute inset-0 grid place-items-center text-lg font-bold">
-              100%
-            </p>
-          ) : null}
+      <ChartCard title="Répartition des dépenses" iconColor="teal">
+        <div className="relative h-56">
+          {donut.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donut}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={54}
+                    outerRadius={78}
+                    paddingAngle={3}
+                    cornerRadius={4}
+                    stroke="none"
+                  >
+                    {donut.map((entry, i) => (
+                      <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(value) => formatMoney(Number(value))}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                  Total
+                </p>
+                <p className="text-[18px] font-bold leading-tight">
+                  {formatMoney(totalCost)}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="grid h-full place-items-center text-[12px] text-muted">
+              Aucune dépense sur cette période
+            </div>
+          )}
         </div>
+        {donut.length > 0 ? (
+          <div className="mt-2 grid gap-1.5">
+            {donut.map((entry, i) => (
+              <div key={entry.name} className="flex items-center gap-2 text-[11px]">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                />
+                <span className="flex-1 text-muted">{entry.name}</span>
+                <span className="font-semibold text-ink">{formatMoney(entry.value)}</span>
+                <span className="w-9 text-right text-muted">
+                  {Math.round((entry.value / totalCost) * 100)} %
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </ChartCard>
 
-      <ChartCard title="Graphique du compteur kilométrique" iconColor="teal">
+      <ChartCard title="Compteur kilométrique" iconColor="teal">
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={odo}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis domain={["dataMin - 500", "dataMax + 500"]} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Line
+            <AreaChart data={odo} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="odoFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--aura-accent-solid)" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="var(--aura-accent-solid)" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--aura-line)" strokeDasharray="2 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                domain={["dataMin - 500", "dataMax + 500"]}
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                width={48}
+                tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
+              />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={{ color: "var(--aura-ink-3)", fontSize: 10 }}
+                formatter={(value) => formatKmGrouped(Number(value))}
+              />
+              <Area
                 type="monotone"
                 dataKey="km"
-                name="Plein"
+                name="Compteur"
                 stroke="var(--aura-accent-solid)"
-                strokeWidth={2}
-                dot={{ fill: "var(--color-chart-plein)", r: 4 }}
+                strokeWidth={2.5}
+                fill="url(#odoFill)"
+                dot={false}
+                activeDot={{
+                  r: 4,
+                  fill: "var(--aura-accent-solid)",
+                  stroke: "var(--aura-surface)",
+                  strokeWidth: 2,
+                }}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </ChartCard>
@@ -511,10 +714,9 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
     )
   }
 
-  const monthly = monthlyBuckets(fills, [], [], []).map((m) => ({
-    ...m,
-    label: m.key.slice(5),
-  }))
+  const chart = groupChartData(monthlyBuckets(fills, [], [], []))
+  const monthly = chart.rows
+  const periodLabel = chart.yearly ? "par an" : "par mois"
   const priceSeries = [...fills]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((f) => ({
@@ -527,28 +729,28 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
     <div className="space-y-3 px-3 pt-3">
       <div className="grid grid-cols-2 gap-3">
         <Kpi
-          tone="orange"
+          tone="teal"
           icon={<Wallet className="h-4 w-4" />}
           title="Coût"
           value={formatMoney(agg.totalCost)}
           lines={[`Min ${formatMoney(agg.minCost)}`, `Max ${formatMoney(agg.maxCost)}`]}
         />
         <Kpi
-          tone="orange"
+          tone="teal"
           icon={<Fuel className="h-4 w-4" />}
           title="Total de litres"
           value={formatLitres(agg.totalLitres)}
           lines={[`Min ${formatLitres(agg.minLitres)}`, `Max ${formatLitres(agg.maxLitres)}`]}
         />
         <Kpi
-          tone="orange"
+          tone="teal"
           icon={<TrendingUp className="h-4 w-4" />}
           title="Prix moyen/L"
           value={formatMoney(agg.avgPrice)}
           lines={[`Min ${formatMoney(agg.minPrice)}`, `Max ${formatMoney(agg.maxPrice)}`]}
         />
         <Kpi
-          tone="orange"
+          tone="teal"
           icon={<Gauge className="h-4 w-4" />}
           title="Consommation"
           value={agg.avgConsumption > 0 ? formatConsumption(agg.avgConsumption) : "—"}
@@ -558,7 +760,7 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
 
       <Card className="px-4 py-4">
         <p className="mb-3 flex items-center gap-2 text-[14px] font-semibold">
-          <Fuel className="h-4 w-4 text-orange" />
+          <Fuel className="h-4 w-4 text-teal" />
           Fréquence de ravitaillement
         </p>
         <div className="grid grid-cols-2 gap-3 text-center">
@@ -571,9 +773,9 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
             <p className="text-lg font-bold">~{formatNumber(agg.avgIntervalDays, 2)} Jours</p>
           </div>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-orange-soft">
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-teal-soft">
           <div
-            className="h-full rounded-full bg-orange"
+            className="h-full rounded-full bg-teal"
             style={{
               width: `${Math.min(
                 100,
@@ -592,15 +794,38 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
         </p>
       </Card>
 
-      <ChartCard title="Tous les volumes mensuels" iconColor="orange">
+      <ChartCard title={`Volumes ${periodLabel}`} iconColor="teal">
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthly}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="litres" name="Litres" fill="var(--color-chart-plein)" radius={[6, 6, 0, 0]} />
+            <BarChart data={monthly} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="var(--aura-line)" strokeDasharray="2 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                width={44}
+              />
+              <Tooltip
+                cursor={{ fill: "var(--aura-accent-soft)", opacity: 0.5 }}
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={{ color: "var(--aura-ink-3)", fontSize: 10 }}
+                formatter={(value) => formatLitres(Number(value))}
+              />
+              <Bar
+                dataKey="litres"
+                name="Litres"
+                fill="var(--color-chart-plein)"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={30}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -608,7 +833,7 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
 
       <Card className="px-4 py-4">
         <p className="mb-1 flex items-center gap-2 text-[14px] font-semibold">
-          <Gauge className="h-4 w-4 text-orange" /> Efficacité
+          <Gauge className="h-4 w-4 text-teal" /> Efficacité
         </p>
         <p className="text-2xl font-bold">
           {agg.avgConsumption > 0 ? formatConsumption(agg.avgConsumption) : "—"}
@@ -635,21 +860,24 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
 
       <Card className="px-4 py-4">
         <p className="mb-3 flex items-center gap-2 text-[14px] font-semibold">
-          <Fuel className="h-4 w-4 text-orange" /> Détails par station
+          <Fuel className="h-4 w-4 text-teal" /> Détails par station
         </p>
         <div className="space-y-3">
           {stations.map((s, i) => (
             <div key={s.name} className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{s.name}</p>
-                <p className="text-xs text-muted">
-                  {formatMoney(s.avgPrice)}/L · {s.count} visites
-                </p>
+              <div className="flex min-w-0 items-center gap-2">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: STATION_COLORS[i % STATION_COLORS.length] }}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{s.name}</p>
+                  <p className="text-xs text-muted">
+                    {formatMoney(s.avgPrice)}/L · {s.count} visites
+                  </p>
+                </div>
               </div>
-              <span
-                className="rounded-full px-2 py-0.5 text-xs font-bold text-white"
-                style={{ backgroundColor: STATION_COLORS[i % STATION_COLORS.length] }}
-              >
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-bold text-ink">
                 {formatNumber(s.share, 0)}%
               </span>
             </div>
@@ -658,62 +886,149 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
       </Card>
 
       <div className="grid grid-cols-2 gap-3">
-        <ChartCard title="Par station" iconColor="orange">
+        <ChartCard title="Par station" iconColor="teal">
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={stations} dataKey="count" nameKey="name" innerRadius={28} outerRadius={48}>
+                <Pie
+                  data={stations}
+                  dataKey="count"
+                  nameKey="name"
+                  innerRadius={34}
+                  outerRadius={56}
+                  paddingAngle={2}
+                  stroke="var(--aura-surface)"
+                  strokeWidth={2}
+                >
                   {stations.map((s, i) => (
                     <Cell key={s.name} fill={STATION_COLORS[i % STATION_COLORS.length]} />
                   ))}
                 </Pie>
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  formatter={(value) => `${Number(value)} visite(s)`}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </ChartCard>
-        <ChartCard title="Dépenses" iconColor="orange">
+        <ChartCard title="Dépenses" iconColor="teal">
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={stations} dataKey="total" nameKey="name" innerRadius={28} outerRadius={48}>
+                <Pie
+                  data={stations}
+                  dataKey="total"
+                  nameKey="name"
+                  innerRadius={34}
+                  outerRadius={56}
+                  paddingAngle={2}
+                  stroke="var(--aura-surface)"
+                  strokeWidth={2}
+                >
                   {stations.map((s, i) => (
                     <Cell key={s.name} fill={STATION_COLORS[i % STATION_COLORS.length]} />
                   ))}
                 </Pie>
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  formatter={(value) => formatMoney(Number(value))}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </ChartCard>
       </div>
 
-      <ChartCard title="Prix du carburant dans le temps" iconColor="orange">
+      <ChartCard title="Prix du carburant dans le temps" iconColor="teal">
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={priceSeries}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Area type="monotone" dataKey="prix" name="Prix / L" stroke="var(--color-chart-plein)" fill="var(--color-warn-soft)" />
+            <AreaChart data={priceSeries} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="fuelPriceFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-chart-plein)" stopOpacity={0.26} />
+                  <stop offset="100%" stopColor="var(--color-chart-plein)" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--aura-line)" strokeDasharray="2 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                domain={["auto", "auto"]}
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                width={44}
+              />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={{ color: "var(--aura-ink-3)", fontSize: 10 }}
+                formatter={(value) => `${formatMoney(Number(value))}/L`}
+              />
+              <Area
+                type="monotone"
+                dataKey="prix"
+                name="Prix / L"
+                stroke="var(--color-chart-plein)"
+                strokeWidth={2.5}
+                fill="url(#fuelPriceFill)"
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </ChartCard>
 
-      <ChartCard title="Graphique de consommation" iconColor="orange">
+      <ChartCard title="Consommation" iconColor="teal">
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={priceSeries.filter((p) => p.conso != null)}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} />
-              <Tooltip />
+            <AreaChart
+              data={priceSeries.filter((p) => p.conso != null)}
+              margin={{ top: 6, right: 4, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="fuelConsoFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-chart-depense)" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="var(--color-chart-depense)" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--aura-line)" strokeDasharray="2 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                domain={["auto", "auto"]}
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                width={44}
+              />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={{ color: "var(--aura-ink-3)", fontSize: 10 }}
+                formatter={(value) => formatConsumption(Number(value))}
+              />
               <Area
                 type="monotone"
                 dataKey="conso"
                 name="L/100km"
-                stroke="var(--color-chart-plein)"
-                fill="var(--color-warn-soft)"
+                stroke="var(--color-chart-depense)"
+                strokeWidth={2.5}
+                fill="url(#fuelConsoFill)"
+                dot={false}
+                activeDot={{ r: 4 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -744,9 +1059,13 @@ function SimpleMoney({
                 <p className="font-medium">{i.label}</p>
                 <p className="text-xs text-muted">{formatIsoDate(i.date)}</p>
               </div>
-              <p className="font-bold" style={{ color }}>
-                {formatMoney(i.montant)}
-              </p>
+              <div className="flex items-center gap-2">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <p className="font-bold text-ink">{formatMoney(i.montant)}</p>
+              </div>
             </div>
           ))
         )}
@@ -776,10 +1095,9 @@ function MaintenanceReports({ mains }: { mains: Maintenance[] }) {
   const avg = total / sorted.length
   const last = sorted[0]
 
-  const monthly = monthlyBuckets([], [], sorted, []).map((m) => ({
-    ...m,
-    label: `${m.key.slice(5)}/${m.key.slice(2, 4)}`,
-  }))
+  const chart = groupChartData(monthlyBuckets([], [], sorted, []))
+  const monthly = chart.rows
+  const periodLabel = chart.yearly ? "par an" : "par mois"
 
   const byTypeMap = new Map<string, { name: string; count: number; total: number }>()
   for (const m of sorted) {
@@ -801,7 +1119,7 @@ function MaintenanceReports({ mains }: { mains: Maintenance[] }) {
     <div className="space-y-3 px-3 pt-3">
       <div className="grid grid-cols-2 gap-3">
         <Kpi
-          tone="brown"
+          tone="slate"
           icon={<Wallet className="h-4 w-4" />}
           title="Coût total"
           value={formatMoney(total)}
@@ -811,7 +1129,7 @@ function MaintenanceReports({ mains }: { mains: Maintenance[] }) {
           ]}
         />
         <Kpi
-          tone="brown"
+          tone="slate"
           icon={<Gauge className="h-4 w-4" />}
           title="Dernier entretien"
           value={formatKmGrouped(last.kilometrage)}
@@ -836,15 +1154,39 @@ function MaintenanceReports({ mains }: { mains: Maintenance[] }) {
         />
       </div>
 
-      <ChartCard title="Coût des entretiens par mois" iconColor="brown">
+      <ChartCard title={`Coût des entretiens ${periodLabel}`} iconColor="slate">
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthly}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="entretien" name="Entretien" fill="var(--color-chart-entretien)" radius={[6, 6, 0, 0]} />
+            <BarChart data={monthly} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="var(--aura-line)" strokeDasharray="2 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "var(--aura-ink-3)" }}
+                axisLine={false}
+                tickLine={false}
+                width={46}
+                tickFormatter={(value) => compactMoney(Number(value))}
+              />
+              <Tooltip
+                cursor={{ fill: "var(--aura-accent-soft)", opacity: 0.5 }}
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={{ color: "var(--aura-ink-3)", fontSize: 10 }}
+                formatter={(value) => formatMoney(Number(value))}
+              />
+              <Bar
+                dataKey="entretien"
+                name="Entretien"
+                fill="var(--color-chart-entretien)"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={30}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -932,7 +1274,7 @@ function Kpi({
   value,
   lines,
 }: {
-  tone: "teal" | "orange" | "green" | "gray" | "brown"
+  tone: "teal" | "orange" | "green" | "gray" | "brown" | "lime" | "slate"
   icon: ReactNode
   title: string
   value: string
@@ -944,6 +1286,8 @@ function Kpi({
     green: "text-accent-revenu bg-green-50",
     gray: "text-slate-500 bg-slate-100",
     brown: "text-accent-entretien bg-surface-2",
+    lime: "text-ink bg-lime-soft ring-1 ring-black/5",
+    slate: "text-accent-entretien bg-surface-2",
   }
   return (
     <Card className="px-3 py-3">
@@ -967,18 +1311,13 @@ function ChartCard({
   children,
 }: {
   title: string
-  iconColor: "teal" | "orange" | "brown"
+  iconColor: "teal" | "slate"
   children: ReactNode
 }) {
-  const dot =
-    iconColor === "teal"
-      ? "bg-teal"
-      : iconColor === "orange"
-        ? "bg-orange"
-        : "bg-accent-entretien"
+  const dot = iconColor === "teal" ? "bg-teal" : "bg-accent-entretien"
   return (
     <Card className="px-3 py-3">
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
+      <p className="mb-2 flex items-center gap-2 font-display text-[13px] font-bold">
         <span className={cn("h-4 w-4 rounded-sm", dot)} />
         {title}
       </p>
@@ -1004,9 +1343,9 @@ function RangeBar({
   const pct = Math.min(100, Math.max(0, ((value - min) / span) * 100))
   return (
     <div className="mt-2">
-      <div className="relative h-1.5 rounded-full bg-gray-200">
+      <div className="relative h-1.5 rounded-full bg-surface-2">
         <span
-          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange"
+          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal"
           style={{ left: `${pct}%` }}
         />
       </div>
