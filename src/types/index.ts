@@ -77,6 +77,8 @@ export interface Refueling {
   carburant: FuelType
   pleinComplet: boolean
   station: string
+  stationLatitude?: number
+  stationLongitude?: number
   notes: string
   conducteur: string
   modePaiement: string

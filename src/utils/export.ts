@@ -194,6 +194,8 @@ export function validateExportPayload(raw: unknown): ValidationResult {
       carburant: (text(item.carburant) || "Diesel") as Refueling["carburant"],
       pleinComplet: boolean(item.pleinComplet),
       station: text(item.station),
+      stationLatitude: typeof item.stationLatitude === "number" ? item.stationLatitude : undefined,
+      stationLongitude: typeof item.stationLongitude === "number" ? item.stationLongitude : undefined,
       notes: text(item.notes),
       conducteur: text(item.conducteur),
       modePaiement: text(item.modePaiement),

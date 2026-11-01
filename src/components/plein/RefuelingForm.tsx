@@ -24,6 +24,7 @@ import { raiseOdometer } from "../../utils/odometer"
 import { showError } from "../../utils/toast"
 import { FormRow, Toggle, UnderlineField, UnderlineSelect } from "../shared/Form"
 import { OverlayScreen, SaveBar } from "../shared/OverlayScreen"
+import { StationFinder, type FuelStation } from "./StationFinder"
 
 type LastEdited = "price" | "total" | "litres" | null
 
@@ -57,6 +58,7 @@ export function RefuelingForm() {
   const [litres, setLitres] = useState("")
   const [full, setFull] = useState(true)
   const [station, setStation] = useState("")
+  const [stationPosition, setStationPosition] = useState<{ latitude: number; longitude: number } | undefined>()
   const [driver, setDriver] = useState("")
   const [payment, setPayment] = useState("")
   const [notes, setNotes] = useState("")
@@ -77,6 +79,7 @@ export function RefuelingForm() {
     setLitres(String(existing.litres).replace(".", ","))
     setFull(existing.pleinComplet)
     setStation(existing.station)
+    setStationPosition(existing.stationLatitude != null && existing.stationLongitude != null ? { latitude: existing.stationLatitude, longitude: existing.stationLongitude } : undefined)
     setDriver(existing.conducteur)
     setPayment(existing.modePaiement)
     setNotes(existing.notes)
@@ -168,6 +171,7 @@ export function RefuelingForm() {
         carburant,
         pleinComplet: full,
         station: station.trim(),
+        ...(stationPosition ? { stationLatitude: stationPosition.latitude, stationLongitude: stationPosition.longitude } : {}),
         notes,
         conducteur: driver,
         modePaiement: payment,
@@ -293,11 +297,22 @@ export function RefuelingForm() {
       </FormRow>
 
       <FormRow icon={<MapPin className="h-5 w-5" />}>
-        <UnderlineField
-          label="Station service"
-          value={station}
-          onChange={(e) => setStation(e.target.value)}
-        />
+        <div>
+          <UnderlineField
+            label="Station service"
+            list="drivly-station-suggestions"
+            placeholder="Nom de la station"
+            value={station}
+            onChange={(e) => { setStation(e.target.value); setStationPosition(undefined) }}
+          />
+          <datalist id="drivly-station-suggestions">
+            {[...new Set(refuelings.map((fill) => fill.station.trim()).filter(Boolean))].map((name) => <option key={name} value={name} />)}
+          </datalist>
+          <StationFinder onSelect={(selected: FuelStation) => {
+            setStation(selected.name)
+            setStationPosition({ latitude: selected.latitude, longitude: selected.longitude })
+          }} />
+        </div>
       </FormRow>
 
       <FormRow icon={<User className="h-5 w-5" />}>
