@@ -51,14 +51,14 @@ async function showNotification(data) {
   const options = {
     body: data.body,
     tag: data.tag ?? `aura-${Date.now()}`,
+    icon: data.icon || "/pwa-192.png",
+    badge: data.badge || "/notification-badge.png",
     data: {
       url: data.url ?? DEFAULT_URL,
       ...(data.data ?? {}),
     },
   };
 
-  if (data.icon) options.icon = data.icon;
-  if (data.badge) options.badge = data.badge;
   if (Array.isArray(data.actions) && data.actions.length > 0) {
     options.actions = data.actions.slice(0, 2);
   }

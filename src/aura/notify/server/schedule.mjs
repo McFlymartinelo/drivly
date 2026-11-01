@@ -153,7 +153,7 @@ export function createPushService({
 
   async function test(userId) {
     const result = await sendToUser(userId, {
-      title: `${appName} — test`,
+      title: "Notifications activées",
       body: "Les notifications fonctionnent.",
       url: "/",
       tag: "aura-test",

@@ -18,6 +18,7 @@ import {
 } from "../../utils/notifications"
 import { loadServerConfig, type ServerConfig } from "../../utils/server"
 import { showToast } from "../../utils/toast"
+import { useApp } from "../../hooks/useApp"
 import { Card, Toggle } from "../shared/Form"
 
 const STYLE_OPTIONS: Array<{ id: NotificationStyle; label: string }> = [
@@ -34,6 +35,7 @@ export function NotificationsCard() {
     getNotificationPrefs,
   )
   const { notify } = useNotify()
+  const { vehicle } = useApp()
   const [config, setConfig] = useState<ServerConfig | null>(() =>
     loadServerConfig(),
   )
@@ -127,8 +129,8 @@ export function NotificationsCard() {
 
   async function test() {
     notify({
-      title: "Rappel · Drivly",
-      message: "Contrôle technique dans 3 jours",
+      title: "Contrôle technique",
+      message: `Dans 3 jours · ${vehicle?.nom ?? "ton véhicule"}`,
       tone: "info",
       duration: 8000,
       action: { label: "Voir", onClick: () => {} },
@@ -229,7 +231,7 @@ export function NotificationsCard() {
 
           <div className="mt-3">
             <p className="text-[11px] font-semibold text-muted">Style</p>
-            <div className="mt-1 grid grid-cols-4 gap-1 rounded-full bg-app p-1">
+            <div className="mt-1 grid grid-cols-2 gap-1 rounded-2xl bg-app p-1">
               {STYLE_OPTIONS.map((option) => (
                 <button
                   key={option.id}
@@ -237,7 +239,7 @@ export function NotificationsCard() {
                   onClick={() =>
                     updateNotificationPrefs({ style: option.id })
                   }
-                  className={`rounded-full py-1.5 text-[11px] font-semibold ${
+                  className={`rounded-xl py-2 text-[11px] font-semibold ${
                     prefs.style === option.id
                       ? "bg-surface text-ink shadow-sm"
                       : "text-muted"

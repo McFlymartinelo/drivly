@@ -5,6 +5,7 @@ import { useApp } from "../../hooks/useApp"
 import { formatKmGrouped } from "../../utils/format"
 import { exportAll, shareOrDownloadJson } from "../../utils/export"
 import { showError, showToast } from "../../utils/toast"
+import { BrandLogo } from "../shared/BrandLogo"
 import { DrivlyLogo } from "../shared/DrivlyLogo"
 
 export function Header({
@@ -48,16 +49,21 @@ export function Header({
         className="aura-press flex min-w-0 flex-1 items-center gap-4 rounded-2xl text-left"
       >
         <DrivlyLogo />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-semibold leading-tight tracking-[-0.01em] text-ink">
-            {vehicle?.nom ?? "Véhicule"}
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 ring-1 ring-black/5">
+            <BrandLogo marque={vehicle?.marque} className="h-5 w-5" />
           </span>
-          <span className="block truncate text-[11px] leading-tight text-muted">
-            {!ready
-              ? "Chargement…"
-              : vehicle
-                ? formatKmGrouped(vehicle.kmActuel)
-                : "Aucun véhicule"}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold leading-tight tracking-[-0.01em] text-ink">
+              {vehicle?.nom ?? "Véhicule"}
+            </span>
+            <span className="block truncate text-[11px] leading-tight text-muted">
+              {!ready
+                ? "Chargement…"
+                : vehicle
+                  ? formatKmGrouped(vehicle.kmActuel)
+                  : "Aucun véhicule"}
+            </span>
           </span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-muted" />
