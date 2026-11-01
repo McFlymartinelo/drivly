@@ -1,45 +1,89 @@
 @import "tailwindcss";
+@import "./aura/aura.css";
+
+/* ---------------------------------------------------------------------------
+   Pont entre les tokens Aura et les noms historiques de Drivly.
+   Les écrans existants continuent de fonctionner, mais héritent du nouveau
+   vocabulaire visuel (couleurs, rayons, ombres, typographie).
+   ------------------------------------------------------------------------- */
 
 @theme {
-  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--aura-font-sans);
+  --font-display: var(--aura-font-display);
 
-  --color-teal: #00aeef;
-  --color-teal-dark: #0097a7;
-  --color-teal-deep: #00838f;
-  --color-teal-muted: #4dd0e1;
-  --color-teal-soft: #e0f7fa;
-  --color-orange: #f57c00;
-  --color-orange-dark: #ef6c00;
-  --color-orange-soft: #fff3e0;
-  --color-app: #f5f5f5;
-  --color-ink: #212121;
-  --color-muted: #616161;
-  --color-line: #e0e0e0;
-  --color-road: #5c5c5c;
+  --color-teal: var(--aura-accent-solid);
+  --color-teal-bright: var(--aura-accent);
+  --color-teal-dark: oklch(62% 0.13 var(--aura-accent-h));
+  --color-teal-deep: var(--aura-accent-strong);
+  --color-teal-muted: oklch(82% 0.07 var(--aura-accent-h));
+  --color-teal-soft: var(--aura-accent-soft);
 
-  --color-accent-rappel: #7e57c2;
-  --color-accent-checklist: #29b6f6;
-  --color-accent-releve: #ec407a;
-  --color-accent-itineraire: #78909c;
-  --color-accent-entretien: #8d6e63;
-  --color-accent-revenu: #43a047;
-  --color-accent-depense: #ef5350;
-  --color-accent-plein: #ffa726;
+  --color-orange: var(--aura-warn);
+  --color-orange-dark: oklch(60% 0.16 55);
+  --color-orange-soft: var(--aura-warn-soft);
+
+  --color-danger: var(--aura-danger);
+  --color-danger-soft: var(--aura-danger-soft);
+  --color-success: var(--aura-success);
+  --color-success-soft: var(--aura-success-soft);
+  --color-warn: var(--aura-warn);
+  --color-warn-soft: var(--aura-warn-soft);
+  --color-info: var(--aura-info);
+  --color-info-soft: var(--aura-info-soft);
+  --color-ink-2: var(--aura-ink-2);
+  --color-line-strong: var(--aura-line-strong);
+
+  --color-chart-plein: oklch(66% 0.15 62);
+  --color-chart-depense: oklch(58% 0.18 25);
+  --color-chart-entretien: oklch(52% 0.06 55);
+  --color-chart-revenu: oklch(58% 0.13 155);
+  --color-chart-teal: var(--aura-accent-solid);
+
+  --color-app: var(--aura-bg);
+  --color-surface: var(--aura-surface);
+  --color-surface-2: var(--aura-surface-2);
+  --color-ink: var(--aura-ink);
+  --color-muted: var(--aura-ink-3);
+  --color-line: var(--aura-line);
+  --color-road: var(--aura-line-strong);
+
+  --color-accent-rappel: oklch(58% 0.15 300);
+  --color-accent-checklist: oklch(60% 0.13 240);
+  --color-accent-releve: oklch(62% 0.17 355);
+  --color-accent-itineraire: oklch(55% 0.03 245);
+  --color-accent-entretien: oklch(52% 0.07 55);
+  --color-accent-revenu: oklch(58% 0.14 155);
+  --color-accent-depense: oklch(58% 0.18 25);
+  --color-accent-plein: oklch(70% 0.15 65);
+
+  --radius-lg: var(--aura-r-md);
+  --radius-xl: var(--aura-r-lg);
+  --radius-2xl: var(--aura-r-xl);
+
+  --shadow-sm: var(--aura-shadow-1);
+  --shadow-md: var(--aura-shadow-1);
+  --shadow-lg: var(--aura-shadow-2);
+  --shadow-2xl: var(--aura-shadow-3);
 }
 
-html,
-body,
-#root {
-  margin: 0;
-  min-height: 100dvh;
-  background: #eceff1;
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
+/* ---------------------------------------------------------------------------
+   Base applicative
+   ------------------------------------------------------------------------- */
+
+html {
+  background: var(--aura-canvas);
 }
 
 body {
-  overscroll-behavior: none;
+  min-height: 100dvh;
+  background: var(--aura-canvas);
+  color: var(--aura-ink);
+  font-family: var(--aura-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100dvh;
 }
 
 input,
@@ -57,15 +101,90 @@ input[type="number"]::-webkit-outer-spin-button {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
-/* Accessibilité : indicateur de focus visible au clavier. */
+/* Focus clavier : contraste suffisant sur fond clair comme sur fond teal. */
 :focus-visible {
-  outline: 2px solid var(--color-teal);
+  outline: 2px solid var(--aura-accent-strong);
   outline-offset: 2px;
+}
+
+/* Le cadre desktop respire, façon maquette. */
+@media (min-width: 640px) {
+  .app-frame {
+    border-radius: var(--aura-r-2xl);
+    border: 1px solid var(--aura-line);
+    box-shadow: var(--aura-shadow-3);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motifs Drivly
+   ------------------------------------------------------------------------- */
+
+/* En-tête de mois : la seule zone « spectacle » de l'écran. */
+.month-hero {
+  background:
+    radial-gradient(
+      120% 150% at 100% 0%,
+      color-mix(in oklab, var(--aura-accent) 64%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      90% 110% at 0% 100%,
+      oklch(45% 0.12 var(--aura-accent-h) / 0.32),
+      transparent 62%
+    ),
+    linear-gradient(145deg, oklch(25% 0.03 250), oklch(15% 0.022 255));
+}
+
+.month-hero__value {
+  font-family: var(--aura-font-display);
+  font-size: clamp(34px, 10vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-hero__spark {
+  opacity: 0.9;
+}
+
+/* Rail de la timeline : plus fin, moins « route de campagne ». */
+.timeline-rail {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--aura-ink) 24%, transparent),
+    color-mix(in oklab, var(--aura-ink) 6%, transparent)
+  );
+}
+
+.timeline-rail::after {
+  content: "";
+  position: absolute;
+  inset: 3px 2px;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--aura-bg) 0 5px,
+    transparent 5px 12px
+  );
+  opacity: 0.6;
+}
+
+/* Chiffres toujours alignés dans les listes. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Les feuilles modales héritent du fond Aura. */
+.modal-panel {
+  background: var(--aura-surface);
 }
 
 @media (prefers-reduced-motion: reduce) {

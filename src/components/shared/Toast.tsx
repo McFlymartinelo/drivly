@@ -32,8 +32,10 @@ function ToastCard({ toast }: { toast: ToastItem }) {
   return (
     <div
       className={cn(
-        "pointer-events-auto flex w-full max-w-[398px] items-center gap-3 rounded-xl px-4 py-3 text-sm text-white shadow-lg",
-        toast.tone === "error" ? "bg-[#c62828]" : "bg-[#263238]",
+        "pointer-events-auto flex w-full max-w-[398px] items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm shadow-lg",
+        toast.tone === "error"
+          ? "bg-[var(--aura-danger)] text-white"
+          : "bg-[var(--aura-ink)] text-[var(--aura-surface)]",
       )}
     >
       <Icon className="h-4.5 w-4.5 shrink-0" />
@@ -41,7 +43,7 @@ function ToastCard({ toast }: { toast: ToastItem }) {
       {toast.actionLabel && toast.onAction ? (
         <button
           type="button"
-          className="shrink-0 rounded-md px-2 py-1 text-[13px] font-bold uppercase tracking-wide text-teal-muted"
+          className="shrink-0 rounded-md px-2 py-1 text-[13px] font-bold uppercase tracking-wide text-teal-muted opacity-90"
           onClick={() => {
             toast.onAction?.()
             dismissToast(toast.id)

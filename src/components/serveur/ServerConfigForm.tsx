@@ -54,7 +54,7 @@ export function ServerConfigForm({
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-teal-soft text-teal-deep">
           <Server className="h-5 w-5" />
         </span>
-        <p className="text-[12px] leading-snug text-[#616161]">
+        <p className="text-[12px] leading-snug text-muted">
           Tes données restent d'abord sur cet appareil. Une copie versionnée est
           envoyée sur ton serveur Debian, ce qui permet de restaurer en cas de
           perte ou de changer d'appareil.
@@ -116,7 +116,7 @@ export function ServerConfigForm({
       </div>
 
       {error ? (
-        <p className="rounded-lg bg-[#ffebee] px-3 py-2 text-[12px] text-[#b71c1c]">{error}</p>
+        <p className="rounded-lg bg-danger-soft px-3 py-2 text-[12px] text-danger">{error}</p>
       ) : null}
 
       <button

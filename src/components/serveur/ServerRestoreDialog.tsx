@@ -196,7 +196,7 @@ export function ServerRestoreDialog({
                 className={`w-full rounded-xl border px-3 py-2.5 text-left ${
                   isSelected
                     ? "border-teal bg-teal-soft"
-                    : "border-line bg-white"
+                    : "border-line bg-surface"
                 }`}
               >
                 <div className="flex items-baseline justify-between gap-2">
@@ -209,7 +209,7 @@ export function ServerRestoreDialog({
                   </span>
                 </div>
                 <p className="text-[11px] text-muted">{backup.device || "Appareil inconnu"}</p>
-                <p className="mt-0.5 text-[12px] text-[#616161]">
+                <p className="mt-0.5 text-[12px] text-muted">
                   {counts.refuelings ?? 0} pleins · {counts.maintenances ?? 0} entretiens ·{" "}
                   {counts.expenses ?? 0} dépenses
                 </p>
@@ -218,7 +218,7 @@ export function ServerRestoreDialog({
           })}
 
           {error ? (
-            <p className="rounded-lg bg-[#ffebee] px-3 py-2 text-[12px] text-[#b71c1c]">
+            <p className="rounded-lg bg-danger-soft px-3 py-2 text-[12px] text-danger">
               {error}
             </p>
           ) : null}

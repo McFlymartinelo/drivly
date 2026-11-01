@@ -1,4 +1,4 @@
-import { ChevronDown, Download, Search, Share2 } from "lucide-react"
+import { ChevronDown, Download, Loader2, Search, Share2 } from "lucide-react"
 import { useState } from "react"
 import { useLocation } from "react-router-dom"
 import { useApp } from "../../hooks/useApp"
@@ -40,50 +40,57 @@ export function Header({
   }
 
   return (
-    <header className="sticky top-0 z-30 bg-teal pt-[env(safe-area-inset-top)] text-white">
-      <div className="flex items-center gap-2 px-3 py-2.5">
+    <header className="aura-appbar">
+      <button
+        type="button"
+        onClick={onOpenVehicles}
+        aria-label="Changer de véhicule"
+        className="aura-press -ml-1.5 flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl p-1.5 text-left"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-teal-soft p-1.5 text-teal-deep ring-1 ring-black/5">
+          <BrandLogo marque={vehicle?.marque} className="h-7 w-7" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold leading-tight tracking-[-0.01em] text-ink">
+            {vehicle?.marque ?? "Véhicule"}
+          </span>
+          <span className="block truncate text-[11px] leading-tight text-muted">
+            {!ready
+              ? "Chargement…"
+              : vehicle
+                ? `${vehicle.nom} · ${formatKm(vehicle.kmActuel)}`
+                : "Aucun véhicule"}
+          </span>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted" />
+      </button>
+
+      <button
+        type="button"
+        aria-label={isReports ? "Partager la sauvegarde" : "Exporter la sauvegarde"}
+        className="aura-iconbtn disabled:opacity-50"
+        onClick={() => void handleExport()}
+        disabled={busy}
+      >
+        {busy ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : isReports ? (
+          <Share2 className="h-5 w-5" />
+        ) : (
+          <Download className="h-5 w-5" />
+        )}
+      </button>
+
+      {onSearch ? (
         <button
           type="button"
-          onClick={onOpenVehicles}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-black/20 px-2 py-1.5 text-left"
+          aria-label="Rechercher"
+          className="aura-iconbtn -mr-1"
+          onClick={onSearch}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 text-teal">
-            <BrandLogo marque={vehicle?.marque} className="h-7 w-7" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] font-bold leading-tight">
-              {vehicle?.marque ?? "Véhicule"}
-            </span>
-            <span className="block truncate text-[11px] leading-tight text-white/90">
-              {!ready
-                ? "Chargement…"
-                : vehicle
-                  ? `${vehicle.nom} · ${formatKm(vehicle.kmActuel)}`
-                  : "Aucun véhicule"}
-            </span>
-          </span>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-90" />
+          <Search className="h-5 w-5" />
         </button>
-        <button
-          type="button"
-          aria-label={isReports ? "Partager la sauvegarde" : "Exporter la sauvegarde"}
-          className="grid h-10 w-10 place-items-center disabled:opacity-60"
-          onClick={() => void handleExport()}
-          disabled={busy}
-        >
-          {isReports ? <Share2 className="h-5 w-5" /> : <Download className="h-5 w-5" />}
-        </button>
-        {onSearch ? (
-          <button
-            type="button"
-            aria-label="Rechercher"
-            className="grid h-10 w-10 place-items-center"
-            onClick={onSearch}
-          >
-            <Search className="h-5 w-5" />
-          </button>
-        ) : null}
-      </div>
+      ) : null}
     </header>
   )
 }

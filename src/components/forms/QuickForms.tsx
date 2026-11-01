@@ -562,7 +562,7 @@ export function TripForm() {
           <UnderlineField label="Km fin" inputMode="numeric" value={fin} onChange={(e) => setFin(e.target.value)} />
         </div>
         {finValue > 0 && finValue < debutValue ? (
-          <p className="mt-1 text-[12px] text-[#c62828]">
+          <p className="mt-1 text-[12px] text-danger">
             Le compteur d'arrivée doit être supérieur au départ.
           </p>
         ) : null}

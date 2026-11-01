@@ -1,6 +1,7 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import App from "./App.tsx"
+import { ThemeProvider } from "./aura/react"
 import { ErrorBoundary } from "./components/shared/ErrorBoundary.tsx"
 import { ToastHost } from "./components/shared/Toast.tsx"
 import { seedIfEmpty } from "./db/seed.ts"
@@ -20,10 +21,12 @@ async function boot() {
   }
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <ErrorBoundary>
-        <App />
-        <ToastHost />
-      </ErrorBoundary>
+      <ThemeProvider defaultTheme="light" defaultAccent="teal" storageKey="drivly">
+        <ErrorBoundary>
+          <App />
+          <ToastHost />
+        </ErrorBoundary>
+      </ThemeProvider>
     </StrictMode>,
   )
 }

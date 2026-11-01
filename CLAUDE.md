@@ -14,6 +14,30 @@
 
 # Directives du Projet
 
+## Interface : Aura
+
+L'UI repose sur **Aura**, un design system mobile-first copié dans `src/aura/`
+(CSS + primitives React + PWA). Il ne s'installe pas via npm : on copie, puis on
+personnalise.
+
+- Source de vérité : `C:\Users\alex-\Workspace\Perso\Aura`.
+- Tokens : `src/aura/aura.css` (`--aura-*`). Le pont Tailwind est dans
+  `src/index.css` (`@theme`).
+- Contraintes dures :
+  1. Aucune couleur hexadécimale dans un écran : utiliser `var(--aura-*)` ou les
+     classes `bg-surface`, `text-muted`, `border-line`, `text-danger`…
+  2. Une seule carte héro par écran (`Card variant="hero"`).
+  3. Un seul accent. Les états passent par `--aura-success/warn/danger`.
+  4. Cibles tactiles ≥ 44 px, safe areas respectées.
+  5. Glassmorphism réservé aux barres et overlays, jamais au contenu.
+  6. `Sheet` pour les actions secondaires, pas une nouvelle route.
+- Le thème est forcé en clair (`ThemeProvider defaultTheme="light"`) tant que le
+  mode sombre n'est pas audité écran par écran.
+- Pour ajouter un composant du kit au projet :
+  `node C:\Users\alex-\Workspace\Perso\Aura\cli\aura.mjs add Sheet,Segmented --dir .`
+
+Toute refonte visuelle doit rester cohérente avec `Aura/DESIGN.md`.
+
 ## Knowledge Graph Navigation
 - Ce projet utilise Graphify pour la cartographie des dépendances et du contexte.
 - Ne charge pas et ne lis pas l'ensemble des dossiers à l'aveugle.

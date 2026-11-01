@@ -162,7 +162,7 @@ export function MoreScreen() {
               className="flex min-w-0 flex-1 items-center gap-3 text-left"
               onClick={() => setVehicleId(item.id)}
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white p-1.5 shadow-sm">
+              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-surface p-1.5 shadow-sm">
                 <BrandLogo marque={item.marque} className="h-7 w-7" />
               </span>
               <span className="min-w-0">

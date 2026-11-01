@@ -8,7 +8,6 @@ import {
 } from "lucide-react"
 import {
   useCallback,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -27,8 +26,8 @@ const tabs = [
   { id: "more", to: "/plus", label: "Plus", icon: MoreHorizontal, end: false },
 ] as const
 
-const RING = 18
 const DRAG_THRESHOLD = 12
+const PILL_TOP = 6
 
 function tabIndexFromPath(pathname: string, quickAddOpen: boolean): number {
   if (quickAddOpen) return 2
@@ -48,7 +47,6 @@ export function BottomNav({
 }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const glowId = useId().replace(/:/g, "")
   const reduced = useMemo(
     () =>
       typeof window !== "undefined" &&
@@ -59,9 +57,8 @@ export function BottomNav({
   const barRef = useRef<HTMLDivElement>(null)
   const iconRefs = useRef<(HTMLSpanElement | null)[]>([])
   const centersRef = useRef<number[]>([])
-  const cyRef = useRef(22)
 
-  const [box, setBox] = useState({ w: 320, h: 64 })
+  const [box, setBox] = useState({ w: 320, h: 65, pad: 1 })
   const [light, setLight] = useState({ x: 40, stretch: 0 })
 
   const activeIndex = tabIndexFromPath(location.pathname, quickAddOpen)
@@ -78,17 +75,14 @@ export function BottomNav({
     const bar = barRef.current
     if (!bar) return
     const barBox = bar.getBoundingClientRect()
-    setBox({ w: barBox.width, h: barBox.height })
+    setBox({ w: barBox.width, h: barBox.height, pad: bar.clientLeft })
     const centers: number[] = []
-    let cy = 22
     iconRefs.current.forEach((icon) => {
       if (!icon) return
       const r = icon.getBoundingClientRect()
       centers.push(r.left - barBox.left + r.width / 2)
-      cy = r.top - barBox.top + r.height / 2
     })
     if (centers.length === tabs.length) centersRef.current = centers
-    cyRef.current = cy
     if (!inited.current && centers.length === tabs.length) {
       const c = centers[activeIndex] ?? centers[0]
       spring.current = { x: c, v: 0 }
@@ -208,9 +202,6 @@ export function BottomNav({
     }
   }
 
-  const rx = RING * (1 + light.stretch)
-  const ry = RING * (1 - light.stretch * 0.25)
-
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return
     const buttons = Array.from(
@@ -225,11 +216,15 @@ export function BottomNav({
     activate(next)
   }
 
+  const pillW = Math.max(44, (box.w - 18) / tabs.length - 4)
+  const pillH = Math.max(40, box.h - 12)
+  const showPill = activeIndex !== 2
+
   return (
     <nav className="relative z-40 bg-transparent px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-1">
       <div
         ref={barRef}
-        className="relative flex touch-none items-end justify-between overflow-visible rounded-full border border-white/70 bg-white/75 px-1.5 pb-1.5 pt-2 shadow-[0_8px_32px_rgba(0,174,239,0.18)] backdrop-blur-xl select-none"
+        className="aura-glass relative flex touch-none items-end justify-between overflow-visible rounded-full px-[7px] pt-1.5 pb-[5px] shadow-lg select-none"
         onPointerDown={onBarPointerDown}
         onPointerMove={onBarPointerMove}
         onPointerUp={endPointer}
@@ -238,52 +233,23 @@ export function BottomNav({
         role="tablist"
         aria-label="Navigation principale. Touchez un onglet ou faites glisser la lumière."
       >
-        <svg
-          className="pointer-events-none absolute left-0 top-0 overflow-visible"
-          width={box.w}
-          height={box.h}
+        <div
           aria-hidden
-        >
-          <defs>
-            <filter id={`glow-${glowId}`} x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur stdDeviation="2.2" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <ellipse
-            cx={light.x}
-            cy={cyRef.current}
-            rx={rx + 3}
-            ry={ry + 3}
-            fill="none"
-            stroke="#7dd8f7"
-            strokeWidth="7"
-            opacity="0.28"
-            filter={`url(#glow-${glowId})`}
-          />
-          <ellipse
-            cx={light.x}
-            cy={cyRef.current}
-            rx={rx}
-            ry={ry}
-            fill="none"
-            stroke="#00AEEF"
-            strokeWidth="2.2"
-            filter={`url(#glow-${glowId})`}
-          />
-          <ellipse
-            cx={light.x}
-            cy={cyRef.current}
-            rx={rx}
-            ry={ry}
-            fill="none"
-            stroke="#e8f9ff"
-            strokeWidth="1"
-          />
-        </svg>
+          className="aura-tabbar__pill"
+          style={{
+            top: PILL_TOP,
+            bottom: "auto",
+            left: 0,
+            width: pillW,
+            height: pillH,
+            opacity: showPill ? 1 : 0,
+            transform: `translateX(${(light.x - pillW / 2 - box.pad).toFixed(2)}px) scaleX(${(
+              1 +
+              light.stretch * 0.45
+            ).toFixed(3)})`,
+            transition: "opacity 200ms var(--aura-ease-out)",
+          }}
+        />
 
         {tabs.map((tab, i) => {
           const Icon = tab.icon
@@ -297,7 +263,10 @@ export function BottomNav({
               aria-selected={active}
               aria-label={tab.label}
               tabIndex={active ? 0 : -1}
-              className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1"
+              className={cn(
+                "relative z-10 flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1",
+                isAdd && "h-12 justify-end",
+              )}
               onClick={() => {
                 if (ignoreClick.current) {
                   ignoreClick.current = false
@@ -311,22 +280,29 @@ export function BottomNav({
                   iconRefs.current[i] = el
                 }}
                 className={cn(
-                  "grid h-8 w-8 place-items-center rounded-full transition-colors",
-                  isAdd && "bg-teal text-white shadow-md shadow-teal/40",
-                  !isAdd && active && "text-teal",
+                  "grid place-items-center transition-colors",
+                  isAdd
+                    ? "absolute left-1/2 top-[-14px] h-10 w-10 -translate-x-1/2 rounded-[13px] bg-[var(--aura-accent-solid)] text-[var(--aura-on-accent)] shadow-[var(--aura-shadow-accent)]"
+                    : "h-8 w-8 rounded-full",
+                  !isAdd && active && "text-[var(--aura-accent-strong)]",
                   !isAdd && !active && "text-muted",
                 )}
               >
                 {isAdd && quickAddOpen ? (
                   <X className="h-[18px] w-[18px]" strokeWidth={2.4} />
                 ) : (
-                  <Icon className="h-5 w-5" strokeWidth={active || isAdd ? 2.4 : 1.8} />
+                  <Icon
+                    className={isAdd ? "h-[18px] w-[18px]" : "h-5 w-5"}
+                    strokeWidth={active || isAdd ? 2.4 : 1.8}
+                  />
                 )}
               </span>
               <span
                 className={cn(
-                  "max-w-full truncate text-[10px] font-medium",
-                  isAdd ? "text-teal" : active ? "text-teal" : "text-muted",
+                  "max-w-full truncate text-[10px] font-semibold tracking-[-0.01em]",
+                  isAdd || active
+                    ? "text-[var(--aura-accent-strong)]"
+                    : "text-muted",
                 )}
               >
                 {isAdd ? (quickAddOpen ? "Fermer" : "Ajouter") : tab.label}

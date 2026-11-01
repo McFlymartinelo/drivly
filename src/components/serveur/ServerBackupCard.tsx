@@ -82,7 +82,7 @@ export function ServerBackupCard() {
                   status.state === "saved"
                     ? "bg-emerald-500"
                     : status.state === "error"
-                      ? "bg-[#c62828]"
+                      ? "bg-danger"
                       : status.state === "saving"
                         ? "bg-orange"
                         : "bg-slate-300"
@@ -92,7 +92,7 @@ export function ServerBackupCard() {
             </div>
             <p
               className={`text-[12px] leading-snug ${
-                status.state === "error" ? "text-[#c62828]" : "text-muted"
+                status.state === "error" ? "text-danger" : "text-muted"
               }`}
             >
               {statusText(status.state, status.lastSavedAt, status.error)}
@@ -131,7 +131,7 @@ export function ServerBackupCard() {
                   </button>
                   <button
                     type="button"
-                    className="flex items-center gap-1 rounded-full bg-app px-3 py-1.5 text-[12px] font-semibold text-[#616161]"
+                    className="flex items-center gap-1 rounded-full bg-app px-3 py-1.5 text-[12px] font-semibold text-muted"
                     onClick={() => setConfigOpen(true)}
                   >
                     <Settings2 className="h-3.5 w-3.5" /> Configurer

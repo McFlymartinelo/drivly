@@ -1,0 +1,66 @@
+/**
+ * Aura — configuration vite-plugin-pwa recommandée.
+ * Copier dans vite.config.ts, puis adapter le manifest aux tokens du projet.
+ */
+import { VitePWA } from "vite-plugin-pwa"
+
+export const auraPwa = VitePWA({
+  registerType: "autoUpdate",
+  injectRegister: false,
+  includeAssets: [
+    "aura-icon.svg",
+    "apple-touch-icon.png",
+    "pwa-192.png",
+    "pwa-512.png",
+    "pwa-512-maskable.png",
+  ],
+  manifest: {
+    name: "Mon application",
+    short_name: "Mon app",
+    description: "Application web mobile, installable et hors ligne.",
+    lang: "fr",
+    id: "/",
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+    display_override: ["standalone", "minimal-ui"],
+    orientation: "portrait",
+    background_color: "#F5F7F8",
+    theme_color: "#0B1220",
+    categories: ["productivity", "utilities"],
+    icons: [
+      { src: "pwa-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "pwa-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      {
+        src: "pwa-512-maskable.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+    ],
+  },
+  workbox: {
+    globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,woff2}"],
+    navigateFallback: "/index.html",
+    cleanupOutdatedCaches: true,
+    runtimeCaching: [
+      {
+        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "google-fonts-stylesheets",
+          expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
+        },
+      },
+      {
+        urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "google-fonts-webfonts",
+          expiration: { maxEntries: 16, maxAgeSeconds: 60 * 60 * 24 * 365 },
+        },
+      },
+    ],
+  },
+  devOptions: { enabled: true, type: "module" },
+})

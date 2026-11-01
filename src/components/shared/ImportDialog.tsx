@@ -34,7 +34,7 @@ export function ImportBackupDialog({
           {errors.map((error) => (
             <p
               key={error}
-              className="flex items-start gap-2 rounded-lg bg-[#ffebee] px-3 py-2 text-[13px] text-[#b71c1c]"
+              className="flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2 text-[13px] text-danger"
             >
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               {error}

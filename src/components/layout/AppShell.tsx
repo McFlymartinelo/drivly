@@ -24,7 +24,7 @@ export function AppShell() {
         }
       />
       {searchOpen && showSearch ? (
-        <div className="border-b border-line bg-white px-3 py-2">
+        <div className="border-b border-line bg-surface px-3 py-2">
           <input
             autoFocus
             type="search"
@@ -32,7 +32,7 @@ export function AppShell() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher une station, un type…"
-            className="w-full rounded-lg bg-app px-3 py-2 text-sm outline-none"
+            className="aura-input !min-h-11 !rounded-xl !bg-app !text-sm"
           />
         </div>
       ) : null}

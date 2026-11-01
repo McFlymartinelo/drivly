@@ -521,7 +521,7 @@ function ChecklistBody({
             >
               <span
                 className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${
-                  item.done ? "border-teal bg-teal text-white" : "border-line bg-white"
+                  item.done ? "border-teal bg-teal text-white" : "border-line bg-surface"
                 }`}
               >
                 {item.done ? <Check className="h-3.5 w-3.5" /> : null}

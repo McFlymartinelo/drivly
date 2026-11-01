@@ -21,7 +21,7 @@ export function BrandPicker({
           className="flex w-full items-center gap-2 rounded-lg border border-line bg-app px-3 py-2 text-left"
           onClick={() => onChange(value)}
         >
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-white shadow-sm">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-surface shadow-sm">
             <BrandLogo marque={value.name} className="h-5 w-5" />
           </span>
           <span className="text-sm font-semibold">{value.name}</span>
@@ -46,7 +46,7 @@ export function BrandPicker({
               setQuery("")
             }}
           >
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-white">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-surface">
               <BrandLogo marque={brand.name} className="h-5 w-5" />
             </span>
             {brand.name}

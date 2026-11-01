@@ -52,7 +52,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
     return (
       <div className="flex min-h-dvh items-center justify-center bg-app p-6">
-        <div className="w-full max-w-[430px] rounded-2xl bg-white p-5 shadow-lg">
+        <div className="w-full max-w-[430px] rounded-2xl bg-surface p-5 shadow-lg">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-orange-soft text-orange">
               <AlertTriangle className="h-6 w-6" />
@@ -63,7 +63,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             </div>
           </div>
 
-          <pre className="mt-4 max-h-32 overflow-auto rounded-lg bg-app p-3 text-[11px] leading-snug text-[#616161]">
+          <pre className="mt-4 max-h-32 overflow-auto rounded-lg bg-app p-3 text-[11px] leading-snug text-muted">
             {error.message}
           </pre>
 
@@ -84,7 +84,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             </button>
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-full py-3 text-[13px] font-medium text-[#c62828]"
+              className="flex w-full items-center justify-center gap-2 rounded-full py-3 text-[13px] font-medium text-danger"
               onClick={this.resetData}
             >
               <Trash2 className="h-4 w-4" /> Réinitialiser les données locales

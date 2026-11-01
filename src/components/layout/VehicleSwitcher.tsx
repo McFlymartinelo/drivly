@@ -24,8 +24,10 @@ export function VehicleSwitcher({
         {vehicles.map((vehicle) => (
           <div
             key={vehicle.id}
-            className={`flex items-center gap-2 rounded-xl px-3 py-2 ${
-              vehicle.id === vehicleId ? "bg-teal-soft" : "bg-app"
+            className={`aura-press flex items-center gap-1 rounded-xl border px-2 py-1.5 transition-colors ${
+              vehicle.id === vehicleId
+                ? "border-[color-mix(in_oklab,var(--aura-accent)_35%,transparent)] bg-teal-soft"
+                : "border-line bg-surface"
             }`}
           >
             <button
@@ -36,7 +38,7 @@ export function VehicleSwitcher({
                 onClose()
               }}
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white p-1.5 text-teal shadow-sm">
+              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-surface-2 p-1.5 text-teal-deep ring-1 ring-black/5">
                 <BrandLogo marque={vehicle.marque} className="h-7 w-7" />
               </span>
               <span className="min-w-0">
@@ -51,7 +53,7 @@ export function VehicleSwitcher({
             <button
               type="button"
               aria-label={`Modifier ${vehicle.nom}`}
-              className="grid h-9 w-9 place-items-center text-muted"
+              className="aura-iconbtn !h-9 !w-9"
               onClick={() => {
                 onClose()
                 navigate(`/vehicule/${vehicle.id}`)
@@ -66,7 +68,7 @@ export function VehicleSwitcher({
       <div className="mt-4 space-y-2">
         <button
           type="button"
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-teal py-3 text-[14px] font-semibold text-white"
+          className="aura-btn aura-btn--block"
           onClick={() => {
             onClose()
             navigate("/vehicule/nouveau")
@@ -76,7 +78,7 @@ export function VehicleSwitcher({
         </button>
         <button
           type="button"
-          className="w-full py-2 text-sm text-muted"
+          className="aura-btn aura-btn--ghost aura-btn--block !min-h-10 !text-[13px]"
           onClick={() => {
             onClose()
             navigate("/plus")

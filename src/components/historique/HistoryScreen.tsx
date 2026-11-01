@@ -43,11 +43,12 @@ import {
 import { recomputeOdometer } from "../../utils/odometer"
 import { showToast } from "../../utils/toast"
 import { Onboarding } from "../onboarding/Onboarding"
+import { MonthHero } from "./MonthHero"
 
 const REMINDER_TEXT: Record<ReminderLevel, string> = {
   ok: "text-emerald-600",
   soon: "text-orange",
-  late: "text-[#c62828]",
+  late: "text-danger",
 }
 
 
@@ -313,8 +314,48 @@ export function HistoryScreen() {
     return { comparison, expense }
   }
 
+  const heroMonth = months[0]
+  const heroMeta = heroMonth ? monthStats.get(heroMonth.key) : undefined
+  const heroInsight = heroMonth ? insightFor(heroMonth.key) : undefined
+  const heroFills = heroMonth
+    ? heroMonth.items.filter((event) => event.kind === "refueling").length
+    : 0
+  const heroTotal = heroMonth
+    ? heroMonth.items.reduce(
+        (sum, event) =>
+          event.kind === "revenue" || event.kind === "anniversary"
+            ? sum
+            : sum + (event.amount ?? 0),
+        0,
+      )
+    : 0
+  const heroTrend = [...months]
+    .reverse()
+    .slice(-6)
+    .map((month) =>
+      month.items.reduce(
+        (sum, event) =>
+          event.kind === "revenue" || event.kind === "anniversary"
+            ? sum
+            : sum + (event.amount ?? 0),
+        0,
+      ),
+    )
+
   return (
     <div className="pb-6">
+      {heroMonth ? (
+        <MonthHero
+          label={heroMonth.label}
+          total={heroTotal}
+          distance={heroMeta?.distance ?? null}
+          consumption={heroMeta?.consumption ?? null}
+          comparison={heroInsight?.comparison ?? null}
+          fills={heroFills}
+          trend={heroTrend}
+        />
+      ) : null}
+
       <section className="px-4 pt-3">
         <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
           Rappels
@@ -330,13 +371,13 @@ export function HistoryScreen() {
                   key={r.id}
                   type="button"
                   onClick={() => navigate(`/entree/reminder/${r.id}`)}
-                  className="flex w-full overflow-hidden rounded-xl border border-line bg-white text-left shadow-sm"
+                  className="aura-press flex w-full overflow-hidden rounded-2xl border border-line bg-surface text-left shadow-[var(--aura-shadow-1)]"
                 >
                   <span
                     className={cn(
                       "w-1.5",
                       status.level === "late"
-                        ? "bg-[#c62828]"
+                        ? "bg-danger"
                         : status.level === "soon"
                           ? "bg-orange"
                           : "bg-teal",
@@ -346,7 +387,7 @@ export function HistoryScreen() {
                     <span
                       className={cn(
                         "grid h-10 w-10 place-items-center rounded-full text-white",
-                        status.level === "late" ? "bg-[#c62828]" : "bg-orange",
+                        status.level === "late" ? "bg-danger" : "bg-orange",
                       )}
                     >
                       <Fuel className="h-5 w-5" />
@@ -388,9 +429,7 @@ export function HistoryScreen() {
       </section>
 
       <section className="relative mt-4">
-        <div className="absolute bottom-0 left-[18px] top-2 w-[10px] rounded-full bg-road">
-          <div className="absolute inset-y-2 left-1/2 w-0 -translate-x-1/2 border-l-[2px] border-dashed border-white/90" />
-        </div>
+        <div className="timeline-rail absolute bottom-0 left-[18px] top-2 w-[10px] rounded-full" />
 
         {months.length === 0 ? (
           <p className="px-12 py-10 text-sm text-muted">Aucun événement pour le moment.</p>
@@ -403,9 +442,9 @@ export function HistoryScreen() {
               <div key={month.key} className="relative mb-2">
                 {hasData ? (
                   <div className="relative mb-3 ml-12 mr-4">
-                    <div className="absolute top-1/2 -left-[37px] h-2.5 w-6 -translate-y-1/2 rounded-full bg-[#c9c9c9]" />
-                    <div className="rounded-xl border border-black/5 bg-[#ededed] px-4 py-3">
-                      <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#9e9e9e]">
+                    <div className="absolute top-1/2 -left-[37px] h-2.5 w-6 -translate-y-1/2 rounded-full bg-line-strong" />
+                    <div className="rounded-2xl border border-line/80 bg-surface-2 px-4 py-3">
+                      <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-muted">
                         {month.label}
                       </p>
                       <p className="mt-1 text-[16px] font-semibold leading-snug text-ink">
@@ -416,12 +455,12 @@ export function HistoryScreen() {
                           : ""}
                       </p>
                       {insight.comparison ? (
-                        <p className="mt-1 text-[13px] leading-snug text-[#616161]">
+                        <p className="mt-1 text-[13px] leading-snug text-muted">
                           {insight.comparison}
                         </p>
                       ) : null}
                       {insight.expense ? (
-                        <p className="mt-0.5 text-[13px] leading-snug text-[#616161]">
+                        <p className="mt-0.5 text-[13px] leading-snug text-muted">
                           {insight.expense}
                         </p>
                       ) : null}
@@ -545,7 +584,7 @@ function TimelineDot({ kind }: { kind: TimelineEvent["kind"] }) {
         <div className="absolute left-[7px] top-0 z-10 grid h-8 w-8 place-items-center rounded-full bg-teal text-white shadow">
           <Trophy className={iconClass} />
         </div>
-        <div className="absolute left-[30px] top-[-3px] z-20 grid h-5 w-5 place-items-center rounded-full bg-[#2196f3] text-white ring-2 ring-white">
+        <div className="absolute left-[30px] top-[-3px] z-20 grid h-5 w-5 place-items-center rounded-full bg-teal text-white ring-2 ring-white">
           <Cake className="h-3 w-3" />
         </div>
       </>
@@ -586,7 +625,7 @@ function FuelDetails({
   const { vehicle } = useApp()
   const stats = computeRefuelingStats(fill, fills, vehicle)
   return (
-    <div className="mt-3 rounded-lg bg-white px-1 pb-2">
+    <div className="mt-3 rounded-lg bg-surface px-1 pb-2">
       <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
         Carburant
       </p>

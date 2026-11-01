@@ -95,12 +95,12 @@ export function Modal({
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center">
+    <div className="aura-scrim">
       <button
         type="button"
         tabIndex={-1}
         aria-label="Fermer"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0"
         onClick={dismissible ? onClose : undefined}
       />
       <div
@@ -110,11 +110,9 @@ export function Modal({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={cn(
-          "relative flex max-h-[88dvh] w-full max-w-[430px] flex-col rounded-t-2xl bg-white shadow-2xl outline-none sm:rounded-2xl",
-          className,
-        )}
+        className={cn("aura-sheet outline-none", className)}
       >
+        <div className="aura-sheet__handle" aria-hidden />
         <div className="flex items-start gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-[16px] font-bold text-ink">
@@ -180,17 +178,14 @@ export function ConfirmDialog({
         <div className="flex gap-2">
           <button
             type="button"
-            className="flex-1 rounded-full border border-line py-3 text-[14px] font-semibold text-ink"
+            className="aura-btn aura-btn--outline flex-1"
             onClick={onCancel}
           >
             {cancelLabel}
           </button>
           <button
             type="button"
-            className={cn(
-              "flex-1 rounded-full py-3 text-[14px] font-bold text-white",
-              destructive ? "bg-[#c62828]" : "bg-teal",
-            )}
+            className={cn("aura-btn flex-1", destructive && "aura-btn--danger")}
             onClick={onConfirm}
           >
             {confirmLabel}

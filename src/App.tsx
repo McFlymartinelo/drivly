@@ -40,8 +40,8 @@ export default function App() {
     <AppProvider>
       <AutoBackup />
       <BrowserRouter>
-        <div className="flex min-h-dvh justify-center bg-[#cfd8dc]">
-          <div className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-app shadow-2xl">
+        <div className="aura-app flex min-h-dvh justify-center sm:p-4">
+          <div className="app-frame relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-app sm:h-[calc(100dvh-2rem)]">
             <Routes>
               <Route element={<AppShell />}>
                 <Route path="/" element={<HistoryScreen />} />

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Aura maskable">
+  <defs>
+    <linearGradient id="aura-mg" x1="120" y1="110" x2="400" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4FD1FF"/>
+      <stop offset="0.55" stop-color="#00AEEF"/>
+      <stop offset="1" stop-color="#7C5CFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0B1220"/>
+  <!-- Contenu dans la zone sûre (80 % centraux) pour le masque Android. -->
+  <circle cx="256" cy="256" r="112" fill="none" stroke="url(#aura-mg)" stroke-width="22"/>
+  <circle cx="256" cy="256" r="74" fill="none" stroke="url(#aura-mg)" stroke-width="16" opacity="0.6"/>
+  <circle cx="256" cy="256" r="30" fill="url(#aura-mg)"/>
+</svg>

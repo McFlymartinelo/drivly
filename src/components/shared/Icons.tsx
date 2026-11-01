@@ -6,7 +6,7 @@ export function FuelCan({ percent, className }: { percent: number; className?: s
       <svg viewBox="0 0 88 110" className="h-full w-full" aria-hidden>
         <path
           d="M22 18h28l10 10h10v8h-8v62a10 10 0 0 1-10 10H22a10 10 0 0 1-10-10V28a10 10 0 0 1 10-10z"
-          fill="#F57C00"
+          fill="var(--color-chart-plein)"
         />
         <rect x="18" y="32" width="48" height="52" rx="4" fill="#FFB74D" />
         <rect x="54" y="14" width="16" height="10" rx="3" fill="#EF6C00" />

@@ -163,7 +163,7 @@ export function VehicleForm() {
           />
         </div>
         {kmActuelValue < kmInitialValue ? (
-          <p className="mt-1 text-[12px] text-[#c62828]">
+          <p className="mt-1 text-[12px] text-danger">
             Le compteur actuel doit être supérieur au kilométrage de départ.
           </p>
         ) : null}

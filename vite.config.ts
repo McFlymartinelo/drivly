@@ -20,15 +20,20 @@ export default defineConfig({
       manifest: {
         name: "Drivly",
         short_name: "Drivly",
-        description: "Suivi et gestion de véhicules, local-first.",
+        description:
+          "Carnet de bord automobile : pleins, entretiens, dépenses et rappels. Local-first, installable, hors ligne.",
         lang: "fr",
+        dir: "ltr",
+        id: "/",
         start_url: "/",
         scope: "/",
         display: "standalone",
+        display_override: ["standalone", "minimal-ui"],
         orientation: "portrait",
-        background_color: "#F5F5F5",
-        theme_color: "#00AEEF",
-        categories: ["lifestyle", "utilities"],
+        background_color: "#F4F6F8",
+        theme_color: "#F4F6F8",
+        categories: ["lifestyle", "utilities", "productivity"],
+        prefer_related_applications: false,
         icons: [
           {
             src: "pwa-192.png",

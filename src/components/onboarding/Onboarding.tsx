@@ -39,27 +39,27 @@ export function Onboarding() {
 
   return (
     <div className="flex min-h-full flex-col justify-center px-6 py-10">
-      <div className="mx-auto w-full max-w-[360px]">
+      <div className="aura-stagger mx-auto w-full max-w-[360px]">
         <div className="flex items-center gap-3">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-teal text-white shadow-lg shadow-teal/30">
+          <span className="grid h-14 w-14 place-items-center rounded-[20px] bg-[var(--aura-accent-solid)] text-[var(--aura-on-accent)] shadow-[var(--aura-shadow-accent)]">
             <Car className="h-7 w-7" />
           </span>
-          <div>
-            <h1 className="text-[24px] font-bold leading-tight text-ink">Bienvenue sur Drivly</h1>
-            <p className="text-[13px] text-muted">Votre carnet de bord, hors ligne.</p>
+          <div className="min-w-0">
+            <h1 className="aura-h1">Bienvenue sur Drivly</h1>
+            <p className="aura-small mt-1">Votre carnet de bord, hors ligne.</p>
           </div>
         </div>
 
-        <ul className="mt-6 space-y-2 text-[13px] text-[#616161]">
-          <li className="flex items-start gap-2">
+        <ul className="mt-6 space-y-2.5 text-[13px] leading-snug text-ink-2">
+          <li className="flex items-start gap-2.5">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
             Pleins, entretiens, dépenses et rappels au même endroit.
           </li>
-          <li className="flex items-start gap-2">
+          <li className="flex items-start gap-2.5">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
             Consommation réelle, coût au kilomètre et bilan mensuel.
           </li>
-          <li className="flex items-start gap-2">
+          <li className="flex items-start gap-2.5">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
             Vos données restent sur cet appareil, sans compte ni serveur.
           </li>
@@ -68,28 +68,28 @@ export function Onboarding() {
         <div className="mt-7 space-y-2">
           <button
             type="button"
-            className="w-full rounded-full bg-teal py-3.5 text-[15px] font-bold text-white shadow-md"
+            className="aura-btn aura-btn--primary aura-btn--lg aura-btn--block"
             onClick={() => navigate("/vehicule/nouveau")}
           >
             Créer mon véhicule
           </button>
           <button
             type="button"
-            className="w-full rounded-full border border-line bg-white py-3.5 text-[15px] font-semibold text-ink"
+            className="aura-btn aura-btn--outline aura-btn--lg aura-btn--block"
             onClick={() => void startDemo()}
           >
             Explorer avec la démonstration
           </button>
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-full border border-line bg-white py-3.5 text-[15px] font-semibold text-teal-deep"
+            className="aura-btn aura-btn--ghost aura-btn--block gap-2 !text-[14px] text-teal-deep"
             onClick={() => setRestoreOpen(true)}
           >
             <CloudDownload className="h-4 w-4" /> Restaurer depuis le serveur
           </button>
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-2 py-3 text-[13px] font-medium text-muted"
+            className="flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-medium text-muted"
             onClick={() => fileRef.current?.click()}
           >
             <Upload className="h-4 w-4" /> Importer une sauvegarde

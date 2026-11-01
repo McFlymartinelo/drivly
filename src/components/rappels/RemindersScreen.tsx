@@ -17,7 +17,7 @@ import { Card } from "../shared/Form"
 const LEVEL_TEXT: Record<ReminderLevel, string> = {
   ok: "text-emerald-600",
   soon: "text-orange",
-  late: "text-[#c62828]",
+  late: "text-danger",
 }
 
 const LEVEL_RANK: Record<ReminderLevel, number> = { late: 0, soon: 1, ok: 2 }
@@ -129,12 +129,12 @@ export function RemindersScreen() {
           decorated.map(({ reminder, status }) => (
             <div
               key={reminder.id}
-              className="flex overflow-hidden rounded-xl bg-white shadow-sm"
+              className="flex overflow-hidden rounded-xl bg-surface shadow-sm"
             >
               <span
                 className={`w-1.5 ${
                   status.level === "late"
-                    ? "bg-[#c62828]"
+                    ? "bg-danger"
                     : status.level === "soon"
                       ? "bg-orange"
                       : "bg-teal"
@@ -148,7 +148,7 @@ export function RemindersScreen() {
                 >
                   <span
                     className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-white ${
-                      status.level === "late" ? "bg-[#c62828]" : "bg-orange"
+                      status.level === "late" ? "bg-danger" : "bg-orange"
                     }`}
                   >
                     <Fuel className="h-5 w-5" />
@@ -237,7 +237,7 @@ export function RemindersScreen() {
                       className={cn(
                         "mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                         overdue
-                          ? "bg-[#ffebee] text-[#c62828]"
+                          ? "bg-danger-soft text-danger"
                           : "bg-orange-soft text-orange",
                       )}
                     >
@@ -268,7 +268,7 @@ export function RemindersScreen() {
               <button
                 key={reminder.id}
                 type="button"
-                className="w-full rounded-xl bg-white px-4 py-3 text-left text-sm shadow-sm"
+                className="w-full rounded-xl bg-surface px-4 py-3 text-left text-sm shadow-sm"
                 onClick={() => navigate(`/entree/reminder/${reminder.id}`)}
               >
                 {reminder.titre}

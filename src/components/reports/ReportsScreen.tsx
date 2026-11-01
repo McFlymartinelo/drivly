@@ -69,8 +69,8 @@ const periods: Array<{ id: PeriodId; label: string }> = [
   { id: "custom", label: "Perso" },
 ]
 
-const PIE_COLORS = ["#F57C00", "#EF5350", "#8D6E63", "#43A047"]
-const STATION_COLORS = ["#66BB6A", "#26C6DA", "#EC407A", "#EF5350", "#FFA726", "#7E57C2"]
+const PIE_COLORS = ["var(--color-chart-plein)", "var(--color-chart-depense)", "var(--color-chart-entretien)", "var(--color-chart-revenu)"]
+const STATION_COLORS = ["oklch(60% 0.13 155)", "var(--color-chart-teal)", "oklch(62% 0.17 355)", "var(--color-chart-depense)", "var(--color-chart-plein)", "oklch(52% 0.17 300)"]
 
 export function ReportsScreen() {
   const { ready, refuelings, expenses, revenues, maintenances } = useApp()
@@ -221,7 +221,7 @@ export function ReportsScreen() {
 
   return (
     <div className="pb-8">
-      <div className="sticky top-0 z-10 border-b border-line bg-white">
+      <div className="sticky top-0 z-10 border-b border-line bg-[var(--aura-glass-strong)] backdrop-blur-xl">
         <div className="no-scrollbar flex gap-1 overflow-x-auto px-2">
           {tabs.map((t) => {
             const active = tab === t.id
@@ -237,7 +237,7 @@ export function ReportsScreen() {
                 type="button"
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "shrink-0 border-b-2 px-3 py-3 text-[12px] font-bold tracking-wide",
+                  "shrink-0 border-b-2 px-3 py-3 text-[12px] font-bold tracking-[0.02em] transition-colors",
                   active ? accent : "border-transparent text-muted",
                 )}
               >
@@ -249,7 +249,7 @@ export function ReportsScreen() {
       </div>
 
       <div className="px-3 pt-3">
-        <div className="rounded-xl bg-white px-3 py-2.5 text-[13px] shadow-sm">
+        <div className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-[13px] shadow-[var(--aura-shadow-1)]">
           <div className="flex items-center justify-between gap-2">
             <span className="min-w-0 truncate">
               {count} entrée{count > 1 ? "s" : ""} ({formatIsoDate(range.from)} -{" "}
@@ -272,10 +272,10 @@ export function ReportsScreen() {
                 type="button"
                 onClick={() => setPeriod(item.id)}
                 className={cn(
-                  "shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold",
+                  "shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors",
                   period === item.id
                     ? "bg-teal text-white"
-                    : "bg-app text-[#616161]",
+                    : "bg-surface-2 text-muted",
                 )}
               >
                 {item.label}
@@ -322,14 +322,14 @@ export function ReportsScreen() {
       {count > 0 && tab === "depense" ? (
         <SimpleMoney
           items={exps.map((e) => ({ date: e.date, montant: e.montant, label: e.categorie }))}
-          color="#EF5350"
+          color="var(--color-chart-depense)"
         />
       ) : null}
       {count > 0 && tab === "entretien" ? <MaintenanceReports mains={mains} /> : null}
       {count > 0 && tab === "revenu" ? (
         <SimpleMoney
           items={revs.map((e) => ({ date: e.date, montant: e.montant, label: e.categorie }))}
-          color="#43A047"
+          color="var(--color-chart-revenu)"
         />
       ) : null}
     </div>
@@ -433,10 +433,10 @@ function GeneralReports({
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="plein" name="Plein" fill="#F57C00" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="depense" name="Dépense" fill="#EF5350" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="entretien" name="Entretien" fill="#8D6E63" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="revenu" name="Le revenu" fill="#43A047" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="plein" name="Plein" fill="var(--color-chart-plein)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="depense" name="Dépense" fill="var(--color-chart-depense)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="entretien" name="Entretien" fill="var(--color-chart-entretien)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="revenu" name="Le revenu" fill="var(--color-chart-revenu)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -482,9 +482,9 @@ function GeneralReports({
                 type="monotone"
                 dataKey="km"
                 name="Plein"
-                stroke="#00AEEF"
+                stroke="var(--aura-accent-solid)"
                 strokeWidth={2}
-                dot={{ fill: "#F57C00", r: 4 }}
+                dot={{ fill: "var(--color-chart-plein)", r: 4 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -600,7 +600,7 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="litres" name="Litres" fill="#F57C00" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="litres" name="Litres" fill="var(--color-chart-plein)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -694,7 +694,7 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />
               <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} />
               <Tooltip />
-              <Area type="monotone" dataKey="prix" name="Prix / L" stroke="#F57C00" fill="#FFE0B2" />
+              <Area type="monotone" dataKey="prix" name="Prix / L" stroke="var(--color-chart-plein)" fill="var(--color-warn-soft)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -712,8 +712,8 @@ function FuelReports({ fills, all }: { fills: Refueling[]; all: Refueling[] }) {
                 type="monotone"
                 dataKey="conso"
                 name="L/100km"
-                stroke="#F57C00"
-                fill="#FFE0B2"
+                stroke="var(--color-chart-plein)"
+                fill="var(--color-warn-soft)"
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -844,7 +844,7 @@ function MaintenanceReports({ mains }: { mains: Maintenance[] }) {
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="entretien" name="Entretien" fill="#8D6E63" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="entretien" name="Entretien" fill="var(--color-chart-entretien)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -891,7 +891,7 @@ function MaintenanceReports({ mains }: { mains: Maintenance[] }) {
                 onClick={() => navigate(`/entree/maintenance/${m.id}`)}
                 className="flex w-full items-start gap-3 px-4 py-3 text-left"
               >
-                <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#efebe9] text-accent-entretien">
+                <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-accent-entretien">
                   <Wrench className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -943,7 +943,7 @@ function Kpi({
     orange: "text-orange bg-orange-soft",
     green: "text-accent-revenu bg-green-50",
     gray: "text-slate-500 bg-slate-100",
-    brown: "text-accent-entretien bg-[#efebe9]",
+    brown: "text-accent-entretien bg-surface-2",
   }
   return (
     <Card className="px-3 py-3">

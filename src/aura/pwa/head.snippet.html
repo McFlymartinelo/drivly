@@ -1,0 +1,43 @@
+<!-- Aura — head PWA + typographie. À adapter (chemins, couleurs). -->
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover"
+/>
+<meta name="theme-color" content="#F5F7F8" />
+<meta name="color-scheme" content="light dark" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="__APP_NAME__" />
+
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="/aura-icon.svg" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+<!-- Typographie Aura : une display + une UI. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter+Tight:wght@400..700&display=swap"
+  rel="stylesheet"
+/>
+
+<!--
+  Anti-flash de thème : à coller AVANT le CSS, dans <head>.
+  Respecte le choix stocké puis la préférence système.
+-->
+<script>
+  (() => {
+    try {
+      const stored = localStorage.getItem("aura-theme");
+      const dark =
+        stored === "dark" ||
+        ((!stored || stored === "system") &&
+          matchMedia("(prefers-color-scheme: dark)").matches);
+      const root = document.documentElement;
+      root.dataset.theme = dark ? "dark" : "light";
+      root.dataset.accent = localStorage.getItem("aura-accent") || "teal";
+      root.style.colorScheme = dark ? "dark" : "light";
+    } catch {}
+  })();
+</script>
